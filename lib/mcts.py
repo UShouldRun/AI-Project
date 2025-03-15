@@ -1,27 +1,45 @@
 from random import randint
 from abc import ABC, abstractmethod
 from math import sqrt, log
+from typing import TypeVar
+
+State = TypeVar("State")
+Action = TypeVar("Action")
 
 class MCTSInterface(ABC):
+    @staticmethod
     @abstractmethod
-    def play(self):           pass
+    def play(state: State, action: Action) -> State:
+        pass
+
+    @staticmethod
     @abstractmethod
-    def get_states(self):     pass
+    def get_actions(state: State) -> [Action]:
+        pass
+
+    @staticmethod
     @abstractmethod
-    def terminal_state(self): pass
+    def is_terminal_state(state: State) -> bool:
+        pass
+
+    @staticmethod
     @abstractmethod
-    def value(self, state):   pass
+    def value(state: State) -> float:
+        pass
+
+    @staticmethod
     @abstractmethod
-    def copy(self, data):     pass
+    def copy(state: State) -> State:
+        pass
 
 class MCTSNode:
     def __init__(self, data: any, parent: "MCTSNode") -> None:
-        self.data: any            = data
-        self.parent: MCTSNode     = parent
-        self.children: [MCTSNode] = []
-        self.depth: int           = 0 if parent == None else parent.depth + 1
-        self.result: float        = 0
-        self.visits: int          = 0
+        self.data: any              = data
+        self.parent: "MCTSNode"     = parent # MCTSNode type is being defined so we need to use ""
+        self.children: ["MCTSNode"] = []
+        self.depth: int             = 0 if parent == None else parent.depth + 1
+        self.result: float          = 0
+        self.visits: int            = 0
 
     def is_root(self) -> bool:
         return self.parent == None
@@ -71,14 +89,14 @@ class MCTS:
 
     @staticmethod
     def expand(node: MCTSNode, world: MCTSInterface) -> None:
-        if node.is_leaf() and not world.terminal_state(node.data):
+        if node.is_leaf() and not world.is_terminal_state(node.data):
             node.children.extend(MCTSNode(data, node) for data in world.get_states(node.data))
 
     @staticmethod
     def rollout(leaf: MCTSNode, world: MCTSInterface) -> None:
         data: any = world.copy(leaf.data)
 
-        while not world.terminal_state(data):
+        while not world.is_terminal_state(data):
             states: any = world.get_states(data)
             if not states:
                 break
