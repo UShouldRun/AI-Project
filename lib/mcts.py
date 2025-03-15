@@ -1,7 +1,7 @@
-from random import randint
+from random import choice 
 from abc import ABC, abstractmethod
 from math import sqrt, log
-from typing import TypeVar
+from typing import TypeVar, List
 
 State = TypeVar("State")
 Action = TypeVar("Action")
@@ -14,7 +14,7 @@ class MCTSInterface(ABC):
 
     @staticmethod
     @abstractmethod
-    def get_actions(state: State) -> [Action]:
+    def get_actions(state: State) -> List[Action]:
         pass
 
     @staticmethod
@@ -33,13 +33,14 @@ class MCTSInterface(ABC):
         pass
 
 class MCTSNode:
-    def __init__(self, data: any, parent: "MCTSNode") -> None:
-        self.data: any              = data
-        self.parent: "MCTSNode"     = parent # MCTSNode type is being defined so we need to use ""
-        self.children: ["MCTSNode"] = []
-        self.depth: int             = 0 if parent == None else parent.depth + 1
-        self.result: float          = 0
-        self.visits: int            = 0
+    def __init__(self, state: State, action: Action, parent: "MCTSNode") -> None:
+        self.state: State               = state
+        self.action: Action             = action
+        self.parent: "MCTSNode"         = parent # MCTSNode type is being defined so we need to use ""
+        self.children: List["MCTSNode"] = []
+        self.depth: int                 = 0 if parent == None else parent.depth + 1
+        self.result: float              = 0
+        self.visits: int                = 0
 
     def is_root(self) -> bool:
         return self.parent == None
@@ -51,7 +52,7 @@ class MCTSNode:
         node.parent = self
         node.depth = self.depth + 1
 
-    def get_leafs(self) -> ["MCTSNode"]:
+    def get_leafs(self) -> List["MCTSNode"]:
         if self.is_leaf():
             return [self]
 
@@ -62,17 +63,18 @@ class MCTSNode:
 
 class MCTS:
     @staticmethod
-    def encapsulate(data: any) -> MCTSNode:
-        return MCTSNode(data, None)
+    def encapsulate(state: State, action: Action) -> MCTSNode:
+        return MCTSNode(state, action, None)
+
+    def pick_action(root: MCTSNode, c: float) -> Action:
+        assert not root.is_leaf()
+        return max(root.children, key = lambda child: MCTS.evaluate(child, c)).action
 
     @staticmethod
     def random_rollout(tree: MCTSNode, world: MCTSInterface, n: int) -> None:
         for _ in range(n):
-            leafs: [MCTSNode] = tree.get_leafs()
-
-            node: MCTSNode = leafs[randint(0, len(leafs) - 1)]
+            node: MCTSNode = choice(tree.get_leafs())
             MCTS.expand(node, world)
-
             for child in node.children:
                 MCTS.rollout(child, world)
 
@@ -89,20 +91,23 @@ class MCTS:
 
     @staticmethod
     def expand(node: MCTSNode, world: MCTSInterface) -> None:
-        if node.is_leaf() and not world.is_terminal_state(node.data):
-            node.children.extend(MCTSNode(data, node) for data in world.get_states(node.data))
+        if node.is_leaf() and not world.is_terminal_state(node.state):
+            node.children += [
+                MCTSNode(world.play(node.state, action), action, node)
+                for action in world.get_actions(node.state)
+            ]
 
     @staticmethod
     def rollout(leaf: MCTSNode, world: MCTSInterface) -> None:
-        data: any = world.copy(leaf.data)
+        state: State = world.copy(leaf.state)
 
-        while not world.is_terminal_state(data):
-            states: any = world.get_states(data)
-            if not states:
+        while not world.is_terminal_state(state):
+            actions: List[Action] = world.get_actions(state)
+            if not actions:
                 break
-            data = states[randint(0, len(states) - 1)]
+            state = choice([world.play(state, action) for action in actions])
 
-        MCTS.backpropagate(leaf, world.value(data))
+        MCTS.backpropagate(leaf, world.value(state))
 
     @staticmethod
     def backpropagate(leaf: MCTSNode, result: float) -> None:
@@ -117,7 +122,7 @@ class MCTS:
             node = node.parent
 
     @staticmethod
-    def mcts(tree: MCTSNode, world: MCTSInterface, s_initial_rollout: int, s_rollout: int, c: float = round(sqrt(2), 3)) -> MCTSNode:
+    def mcts(tree: MCTSNode, world: MCTSInterface, s_initial_rollout: int, s_rollout: int, c: float = round(sqrt(2), 3)) -> Action:
         MCTS.random_rollout(tree, world, s_initial_rollout)
 
         for _ in range(s_rollout):
@@ -129,4 +134,4 @@ class MCTS:
 
             MCTS.rollout(node, world)
 
-        return max(tree.children, key = lambda child: MCTS.evaluate(child, c)) if tree.children else tree
+        return MCTS.pick_action(tree)
