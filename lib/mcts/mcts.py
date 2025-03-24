@@ -28,7 +28,7 @@ class MCTSInterface(ABC):
     @staticmethod
     @abstractmethod
     def value(state: State) -> float:
-        """Returns the value of the given state (e.g., score or utility). Should be in the interval [0,1]"""
+        """Returns the value of the given state (e.g., score or utility). Should be in the interval [0,1]."""
         pass
 
     @staticmethod
@@ -140,3 +140,7 @@ class MCTS:
             MCTS._rollout(node, world)
 
         return MCTS._pick_action(tree)
+
+class Connect4:
+    def connect4(state: [[int]], action: (int,int), turn: int) -> [(int,int)]:
+        pass
