@@ -32,11 +32,7 @@ def read_csv():
 
     return iris_data
 
-
-
-
-if __name__ == "__main__":
-
+def train_tree(iris_data):
     X = iris_data[:, :-1]  
     y = iris_data[:, -1].astype(int)
     X_train, X_test, y_train, y_test = train_test_split_data(X, y, test_ratio=0.2)
@@ -51,5 +47,13 @@ if __name__ == "__main__":
     correct = np.sum(predictions == y_test)  
     accuracy = correct / len(y_test) 
     print(f"Accuracy: {accuracy:.2%}")
+
+
+
+if __name__ == "__main__":
+
+    iris_dataset=read_csv()
+
+    train_tree(iris_dataset)
 
     
