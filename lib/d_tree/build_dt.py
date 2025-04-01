@@ -44,6 +44,26 @@ def build_tree(X,y):
         if best_gain>0:
             true_branch = build_tree(best_sets[0], best_sets[1])
             false_branch = build_tree(best_sets[2], best_sets[3])
-            return Node(feature=best_criteria[0], value=best_criteria[1], true_branch=true_branch, false_branch=false_branch)
-
+            node= Node(feature=best_criteria[0], value=best_criteria[1], true_branch=true_branch, false_branch=false_branch)
+            return node
         return Node(results=y[0])
+
+def predict(tree, sample):
+    if tree.results is not None:
+        return tree.results
+    else:
+        branch= tree.false_branch
+        if sample[tree.feature] <= tree.value:
+            branch=tree.true_branch
+        return predict(branch,sample)
+
+def print_tree(node, indent=""):
+    """ Recursively prints the decision tree. """
+    if node.results is not None:
+        print(indent + "Leaf:", node.results)
+    else:
+        print(indent + f"Feature {node.feature} <= {node.value}?")
+        print(indent + "  ├─ True:")
+        print_tree(node.true_branch, indent + "  │   ")
+        print(indent + "  └─ False:")
+        print_tree(node.false_branch, indent + "      ")
