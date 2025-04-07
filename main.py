@@ -1,8 +1,6 @@
 from lib.mcts import MCTS
 from lib.mcts import MCTSInterface
-
-def main() -> None:
-    pass
+from src.app  import asyncio, main
 
 if __name__ == "main":
-    main()
+    asyncio.run(main())

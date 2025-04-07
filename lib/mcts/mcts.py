@@ -21,13 +21,13 @@ class MCTSInterface(ABC):
 
     @staticmethod
     @abstractmethod
-    def is_terminal_state(state: State) -> bool:
+    def is_terminal_state(state: State, action: Action) -> bool:
         """Checks if the state is terminal (i.e., no further actions possible)."""
         pass
 
     @staticmethod
     @abstractmethod
-    def value(state: State) -> float:
+    def value(state: State, action: Action) -> float:
         """Returns the value of the given state (e.g., score or utility). Should be in the interval [0,1]."""
         pass
 
@@ -105,13 +105,16 @@ class MCTS:
     @staticmethod
     def _rollout(leaf: MCTSNode, world: MCTSInterface) -> None:
         """Simulates a random rollout from the given leaf node."""
-        state: State = world.copy(leaf.state)
-        while not world.is_terminal_state(state):
+        state: State   = world.copy(leaf.state)
+        action: Action = None
+        while not world.is_terminal_state(state, action):
             actions: List[Action] = world.get_actions(state)
             if not actions:
                 break
-            state = choice([world.play(state, action) for action in actions])
-        MCTS._backpropagate(leaf, world.value(state))
+            state, action = choice([
+                (world.play(state, action), action) for action in actions
+            ])
+        MCTS._backpropagate(leaf, world.value(state, action))
 
     @staticmethod
     def _backpropagate(leaf: MCTSNode, result: float) -> None:
@@ -140,7 +143,3 @@ class MCTS:
             MCTS._rollout(node, world)
 
         return MCTS._pick_action(tree)
-
-class Connect4:
-    def connect4(state: [[int]], action: (int,int), turn: int) -> [(int,int)]:
-        pass

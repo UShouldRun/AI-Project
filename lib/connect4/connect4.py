@@ -1,83 +1,108 @@
-class Connect4:
+from mcts import MCTSInterface
 
+class Board:
+    def __init__(self, rows: int, cols: int) -> None:
+        assert rows == cols
+        self.rows: int = rows
+        self.cols: int = cols
+        self.board: list[list[int]] = [[0 for _ in range(cols)] for _ in range(rows)]
 
-    def __init__(self, int x, int y):
-        self.turn =1 #1 for player 1 and 2 for player 2
-        self.nx=x
-        self.ny=y
-        self.board : [[0]*y for _ in range(x)]
-        
-        self.dirs = [(0, 1), (1, 0), (1, 1), (-1, 1), (-1, -1), (-1, 0), (0, -1), (1, -1)]
+class Connect4(MCTSInterface):
+    @staticmethod
+    def play(state: Board, action: tuple[int, int]) -> Board: 
+        assert not Connect4.is_out_of_bounds(state, 0, action[0]), f"Invalid Action: {action}"
 
-        self.final= False # true if the game has ended
-            
-    def play(self,int x, int y) -> bool: 
-        if self.isValidMove(x,y):
-            self.board[x][y]= self.turn
-            self.checkWining(x,y)
-            self.changeTurn()
-            return True
-        return False
-        
-    def isValidMove(self,int x, int y) -> bool:
-        if self.is_out_of_bounds(x, y) or self.board[x][y]!=0:
-            return False
+        col: int = action[0]
+        row: int = Connect4.action_get_row(state, col)
+        assert row > -1, f"Invalid Action: {action}"
 
-        if y == 0 or self.board[x][y - 1] != 0:  
-            return True
+        turn: int = action[1]
+        assert turn == 1 or turn == 2, f"Invalid Turn: {turn}"
 
-        return False   
+        state.board[row][col] = turn
+        return state
 
-    def getTurn(self) -> int: 
-        return self.turn
+    @staticmethod
+    def get_actions(state: Board) -> list[int]:
+        assert Connect4.is_valid_state(state)
+        rows: int = state.rows
+        cols: int = state.cols
 
-    def changeTurn(self):
-        self.turn= 2 if self.turn==1 else 1
-
-    def getValidMoves(self) -> [[int]]:
-        moves = []
-        for i in range(self.nx):
-            for j in range(self.ny):
-                if self.isValidMove(i,j):
-                    moves.append((i,j))
+        moves: list[int] = []
+        for col in range(cols):
+            for row in range(rows):
+                if state.board[rows - 1 - row][col] == 0:
+                    moves.append(col)
+                    break
         return moves
 
-    def isOutOfBounds(self, x: int, y: int) -> bool:
-        return x>=self.nx or x<0 or y>=self.ny or y<0
+    @staticmethod
+    def is_terminal_state(state: Board, action: tuple[int, int]) -> bool:
+        return action == None or Connect4.value(state, action) > 0
 
-    def clearBoard(self):
-        self.board = [[0] * self.ny for _ in range(self.nx)]
-    
-    def isFinal(self) -> bool: 
+    @staticmethod
+    def value(state: Board, action: tuple[int, int]) -> float:
+        result: int = check_result(state, action)
+        assert result > 0
+        return result / 2
+
+    @staticmethod
+    def copy(state: Board) -> Board:
+        rows, cols = state.rows, state.cols
+        cp: Board = Board(rows, cols)
+        for row in range(rows):
+            for col in range(cols):
+                cp.board[row][col] = state.board[row][col]
+        return cp
+
+    @staticmethod
+    def init_board(rows: int, cols: int) -> Board:
+        return Board(rows, cols)
         
-        return self.final
+    @staticmethod
+    def action_get_row(state: Board, col: int) -> int:
+        rows: int = state.rows
+        for i in range(rows):
+            if state.board[rows - 1 - i][col] == 0:
+                return rows - 1 - i
+        return -1
 
-    def checkWining(self, x: int, y: int) :
-        #checks if last move led to a win in all the directions
-        for dx, dy in self.dirs:
-            count=1 #start with the newly placed piece
-            count+=countInDirection(x, y, dx, dy, True)
-            count+=countInDirection(x, y, dx, dy, False)
-            if(count>=4):
-                self.final=True
-                return 
+    @staticmethod
+    def is_out_of_bounds(state: Board, row: int, col: int) -> bool:
+        return not (0 <= row < state.rows and 0 <= col < state.cols)
 
-        self.final=False
-        return
+    @staticmethod
+    def check_result(state: Board, action: tuple[int, int]) -> int:
+        turn: int = action[1]
+        col: int  = action[0]
+        row: int  = -1
 
-    def countInDirection(self,x: int, y: int, dx: int, dy: int, positive: bool) ->int:
-        count=0
-        while True:
-            x = x + dx if positive else x - dx
-            y = y + dy if positive else y - dy
-
-            if self.isOutOfBounds(x, y) or self.board[x][y] != self.turn:
+        rows: int = state.rows
+        for i in range(rows):
+            if i < rows - 1 and state.board[rows - 1 - (i + 1)][col] == 0:
+                row = i
                 break
+        assert state.board[row][col] == turn
 
+        dirs: list[tuple[int, int]] = [
+            (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1)
+            #  E        NE        N       NW        W      SW      S       SE
+        ]
+        for drow, dcol in dirs:
+            if Connect4.count_in_direction(state, row + drow, col + dcol, drow, dcol, turn) >= 3:
+                return 2 # win
+
+        cols: int = state.cols
+        for col in range(cols):
+            if state.board[0][col] == 0:
+                return 0 # not terminal state
+        return 1 # draw
+
+    @staticmethod
+    def count_in_direction(state: Board, row: int, col: int, drow: int, dcol: int, turn: int) -> int:
+        count: int = 0
+        while not Connect4.is_out_of_bounds(state, row, col) and state.board[row][col] == turn:
             count += 1
-
+            row   += drow
+            col   += dcol
         return count
-
-
-
-
