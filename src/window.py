@@ -7,7 +7,7 @@ class Window:
         self.resize(scale)
         pygame.display.set_caption("Connect4")
 
-    def resize(scale: float) -> None:
+    def resize(self, scale: float) -> None:
         self.scale = scale
         if scale == 1.00:
             self.window = pygame.display.set_mode(
@@ -15,5 +15,5 @@ class Window:
             )
         else:
             self.window = pygame.display.set_mode(
-                (self.scale * self.info.current_width, self.scale * self.info.current_height)
+                (self.scale * self.info.current_w, self.scale * self.info.current_h)
             )
