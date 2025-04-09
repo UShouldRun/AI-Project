@@ -13,7 +13,19 @@ class App:
         self.game_start:  bool            = False
         self.gamemode:    int             = 0
         self.opponent:    int             = 0
-        self.mouse_click: tuple[int, int] = None 
+        self.mouse_click: tuple[int, int] = None
+
+        font = pygame.font.Font(None, int(self.window.scale * self.window.info.current_w) // 25)
+
+        esc: pygame.Rect = pygame.Rect(
+            int(0.895 * self.window.scale * self.window.info.current_w),
+            int(0.90 * self.window.scale * self.window.info.current_h),
+            # half the screen minus the button height minus half the center button height
+            int(self.window.scale * self.window.info.current_w) // 10,
+            int(self.window.scale * self.window.info.current_h) // 10
+        )
+        text_esc = font.render("Menu", True, (255, 255, 255))
+        self.esc_button = (esc, text_esc)
 
         button_pvp: pygame.Rect = pygame.Rect(
             int(self.window.scale * self.window.info.current_w) // 4,
@@ -37,7 +49,6 @@ class App:
             int(0.2 * self.window.scale * self.window.info.current_h)
         )
 
-        font = pygame.font.Font(None, int(self.window.scale * self.window.info.current_w) // 25)
         text_pvp = font.render("P VS P", True, (255, 255, 255))
         text_pvb = font.render("P VS B", True, (255, 255, 255))
         text_bvb = font.render("B VS B", True, (255, 255, 255))
@@ -77,7 +88,7 @@ class App:
         self.player2_win = font.render("Player 2 Wins", True, (218, 62, 82))
 
 def draw_base(window: Window) -> None:
-    color: tuple[int, int, int] = (184, 219, 217)
+    color: tuple[int, int, int] = (147, 175, 174)
     window.window.fill(color)
 
 def draw_menu(app: App) -> int:
@@ -120,39 +131,62 @@ def draw_result(app: App, result: int) -> None:
         )
     )
 
-def draw_game(window: Window, state: Board) -> None:
-    draw_base(window)
+def draw_game(app: App, state: Board) -> None:
+    draw_base(app.window)
+
+    pygame.draw.rect(app.window.window, (47, 69, 80), app.esc_button[0])
+    app.window.window.blit(
+        app.esc_button[1],
+        app.esc_button[1].get_rect(
+            center = (
+                (app.esc_button[0].x + app.esc_button[0].width - app.esc_button[1].get_rect().width) // 2,
+                (app.esc_button[0].y + app.esc_button[0].height - app.esc_button[1].get_rect().height) // 2
+            )
+        )
+    )
 
     rows, cols = state.rows, state.cols
     s_row, s_col = (
-        int(window.scale * window.info.current_h) // (rows + 1), # extra row for piece to be placed
-        int(window.scale * window.info.current_h) // cols        # square board
+        int(app.window.scale * app.window.info.current_h) // (rows + 1), # extra row for piece to be placed
+        int(app.window.scale * app.window.info.current_h) // cols        # square board
     )
 
     base_rect: pygame.Rect = pygame.Rect(
-        int(window.scale * window.info.current_w - cols * s_col) // 2,
+        int(app.window.scale * app.window.info.current_w - cols * s_col) // 2,
         s_row,
         cols * s_col,
         rows * s_row
     )
-    pygame.draw.rect(window.window, (47, 69, 80), base_rect)
+    pygame.draw.rect(app.window.window, (47, 69, 80), base_rect)
+
+    app.esc_button[0].y = base_rect.y + base_rect.height - app.esc_button[0].height
+    pygame.draw.rect(app.window.window, (47, 69, 80), app.esc_button[0])
+    app.window.window.blit(
+        app.esc_button[1],
+        app.esc_button[1].get_rect(
+            center = (
+                app.esc_button[0].x + app.esc_button[0].width // 2,
+                app.esc_button[0].y + app.esc_button[0].height // 2
+            )
+        )
+    )
 
     color: tuple[int, int, int] = (184, 219, 217)
     radius: int = int(0.90 * min(s_row, s_col)) // 2
 
     for i in range(rows):
         for j in range(cols):
-            if state.board[i][j] == 1:
+            if state.get_piece(i, j) == 1:
                 color = (242, 233, 78)
-            elif state.board[i][j] == 2:
+            elif state.get_piece(i, j) == 2:
                 color = (218, 62, 82)
             else:
-                color = (184, 219, 217)
+                color = (147, 175, 174)
 
             center: tuple[int, int] = (
                 base_rect.x + j * (s_col + 1) + s_col // 2, base_rect.y + i * s_row + s_row // 2
             )
-            pygame.draw.circle(window.window, color, center, radius)
+            pygame.draw.circle(app.window.window, color, center, radius)
 
     mouse_x, _ = pygame.mouse.get_pos()
     center: tuple[int, int] = (
@@ -165,8 +199,8 @@ def draw_game(window: Window, state: Board) -> None:
         ),
         s_row // 2
     )
-    color = (242, 233, 78) if state.turn == 1 else (218, 62, 82)
-    pygame.draw.circle(window.window, color, center, radius)
+    color = (242, 233, 78) if state.player == 1 else (218, 62, 82)
+    pygame.draw.circle(app.window.window, color, center, radius)
 
 def player_action(app: App, state: Board) -> int:
     cols: int  = state.cols
@@ -182,7 +216,7 @@ def player_action(app: App, state: Board) -> int:
 
     rows: int = state.rows
     for i in range(rows):
-        if state.board[rows - 1 - i][col] == 0:
+        if state.get_piece(rows - 1 - i, col) == 0:
             return col
 
     return None
@@ -191,24 +225,26 @@ async def pick_action(app: App, state: Board) -> int:
     action: int = None
     match app.gamemode:
         case 1:
-            if app.mouse_click != None:
+            if app.mouse_click is not None:
                 action = player_action(app, state)
         case 2:
-            if state.turn == 1 and app.mouse_click != None:
+            if state.player == 1 and app.mouse_click is not None:
                 action = player_action(app, state)
-            elif state.turn == 2 and app.opponent == 1:
+            elif state.player == 2 and app.opponent == 1:
                 mcts_choice = asyncio.create_task(
-                    MCTS.mcts(state, 2, Connect4, 500, 5000)
+                    MCTS.mcts(state, Connect4, int(1e5), debug = True, timer = True)
                 )
                 action = await mcts_choice
         case 3:
-            pass
-
+            mcts_choice = await asyncio.create_task(
+                MCTS.mcts(state, Connect4, int(1e5), debug = True, timer = False)
+            )
+            action = await mcts_choice
     return action
 
 async def game(app: App, state: Board) -> tuple[Board, int]:
     action: int = await pick_action(app, state)
-    if action == None:
+    if not isinstance(action, int):
         return state, 0
     state = Connect4.play(state, action)
     return state, Connect4.check_result(state, action)
@@ -236,19 +272,27 @@ async def main() -> None:
         if app.gamemode > 0 and app.opponent > 0:
             if app.game_start:
                 app.game_start = False
-                state: Board = Connect4.init_board(7, 7)
-                in_game = True
+                state: Board = Connect4.init_board(6, 7)
+                app.in_game = True
 
-            if in_game:
-                task_game = asyncio.create_task(game(app, state))
-                state, result = await task_game
+            app.in_game = not (
+                    app.mouse_click != None 
+                and app.esc_button[0].collidepoint(app.mouse_click[0], app.mouse_click[1])
+            )
+
+            if app.in_game:
+                current_task = asyncio.create_task(game(app, state))
+                state, result = await current_task
                 in_game = result == 0
+                current_task = None
+
                 app.mouse_click = None
-                draw_game(app.window, state)
+                draw_game(app, state)
+
             else:
                 if result == 2:
                     timer_start = time.time()
-                    outcome = Connect4.reverse_turn(state.turn)
+                    outcome = Connect4.reverse_player(state.player)
                 if timer_start != None and time.time() - timer_start <= duration:
                     draw_result(app, outcome)
                 else:
