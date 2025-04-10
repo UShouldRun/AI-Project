@@ -244,7 +244,7 @@ async def pick_action(app: App, state: Board) -> int:
 
 async def game(app: App, state: Board) -> tuple[Board, int]:
     action: int = await pick_action(app, state)
-    if not isinstance(action, int):
+    if not type(action) == int:
         return state, 0
     state = Connect4.play(state, action)
     return state, Connect4.check_result(state, action)
@@ -275,7 +275,7 @@ async def main() -> None:
                 state: Board = Connect4.init_board(6, 7)
                 app.in_game = True
 
-            app.in_game = not (
+            app.in_game = app.in_game and not (
                     app.mouse_click != None 
                 and app.esc_button[0].collidepoint(app.mouse_click[0], app.mouse_click[1])
             )
@@ -283,7 +283,7 @@ async def main() -> None:
             if app.in_game:
                 current_task = asyncio.create_task(game(app, state))
                 state, result = await current_task
-                in_game = result == 0
+                app.in_game = result == 0
                 current_task = None
 
                 app.mouse_click = None

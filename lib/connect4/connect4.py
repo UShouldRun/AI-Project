@@ -1,4 +1,4 @@
-from lib.mcts import MCTSInterface
+from lib.mcts import MCTSInterface, Optional
 
 class Board:
     def __init__(self, rows: int, cols: int) -> None:
@@ -57,13 +57,14 @@ class Connect4(MCTSInterface):
         return action != None and Connect4.value(state, action, state.player) > -1
 
     @staticmethod
-    def value(state: Board, action: int, player: int) -> float:
-        assert player == 1 or player == 2
+    def value(state: Board, action: int, player: Optional[int] = None) -> float:
         result: int = Connect4.check_result(state, action)
         if result == 0:
             return -1
-        # inverse because if the resulting state is final, then the reverse player won or drew
-        return (result / 2) if state.player != player else (1 - result / 2)
+        if player is None:
+            return result / 2
+        assert player == 1 or player == 2
+        return result / 2 if state.player != player else 1 - result / 2
 
     @staticmethod
     def heuristic(state: Board, player: int) -> float:
@@ -159,7 +160,6 @@ class Connect4(MCTSInterface):
 
     @staticmethod
     def check_result(state: Board, action: int) -> int:
-        player: int = Connect4.reverse_player(state.player)
         col: int    = action
         row: int    = Connect4.action_get_row(state, col) + 1
 
