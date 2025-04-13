@@ -1,4 +1,4 @@
-from lib.connect4 import Connect4, Board
+from lib.connect4 import Connect4, Connect4Board
 from lib.mcts import MCTS
 from src.window import Window
 
@@ -86,6 +86,7 @@ class App:
 
         self.player1_win = font.render("Player 1 Wins", True, (242, 233, 78))
         self.player2_win = font.render("Player 2 Wins", True, (218, 62, 82))
+        self.draw = font.render("Draw", True, (218, 62, 82))
 
 def draw_base(window: Window) -> None:
     color: tuple[int, int, int] = (147, 175, 174)
@@ -131,7 +132,7 @@ def draw_result(app: App, result: int) -> None:
         )
     )
 
-def draw_game(app: App, state: Board) -> None:
+def draw_game(app: App, state: Connect4Board) -> None:
     draw_base(app.window)
 
     pygame.draw.rect(app.window.window, (47, 69, 80), app.esc_button[0])
@@ -202,7 +203,7 @@ def draw_game(app: App, state: Board) -> None:
     color = (242, 233, 78) if state.player == 1 else (218, 62, 82)
     pygame.draw.circle(app.window.window, color, center, radius)
 
-def player_action(app: App, state: Board) -> int:
+def player_action(app: App, state: Connect4Board) -> int:
     cols: int  = state.cols
     s_col: int = int(app.window.scale * app.window.info.current_h) // cols
     x: int     = int(
@@ -221,7 +222,7 @@ def player_action(app: App, state: Board) -> int:
 
     return None
 
-async def pick_action(app: App, state: Board) -> int:
+async def pick_action(app: App, state: Connect4Board) -> int:
     action: int = None
     match app.gamemode:
         case 1:
@@ -232,17 +233,17 @@ async def pick_action(app: App, state: Board) -> int:
                 action = player_action(app, state)
             elif state.player == 2 and app.opponent == 1:
                 mcts_choice = asyncio.create_task(
-                    MCTS.mcts(state, Connect4, int(1e5), debug = True, timer = True)
+                    MCTS.mcts(state, Connect4, int(1e5), 7, debug = True, timer = True)
                 )
                 action = await mcts_choice
         case 3:
             mcts_choice = await asyncio.create_task(
-                MCTS.mcts(state, Connect4, int(1e5), debug = True, timer = False)
+                MCTS.mcts(state, Connect4, int(1e5), 7, debug = True, timer = False)
             )
             action = await mcts_choice
     return action
 
-async def game(app: App, state: Board) -> tuple[Board, int]:
+async def game(app: App, state: Connect4Board) -> tuple[Connect4Board, int]:
     action: int = await pick_action(app, state)
     if not type(action) == int:
         return state, 0
@@ -253,7 +254,7 @@ async def main() -> None:
     pygame.init()
     app: App = App()
 
-    state: Board = None
+    state: Connect4Board = None
 
     outcome: int = 0
     timer_start = None
@@ -272,7 +273,7 @@ async def main() -> None:
         if app.gamemode > 0 and app.opponent > 0:
             if app.game_start:
                 app.game_start = False
-                state: Board = Connect4.init_board(6, 7)
+                state: Connect4Board = Connect4.init_board(6, 7)
                 app.in_game = True
 
             app.in_game = app.in_game and not (
@@ -293,11 +294,16 @@ async def main() -> None:
                 if result == 2:
                     timer_start = time.time()
                     outcome = Connect4.reverse_player(state.player)
+                elif result > 0:
+                    timer_start = time.time()
+                    outcome = 3
+
                 if timer_start != None and time.time() - timer_start <= duration:
                     draw_result(app, outcome)
                 else:
                     outcome = 0
                     app.gamemode = 0
+
                 result = 0
 
         else:

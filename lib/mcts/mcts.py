@@ -1,4 +1,4 @@
-from random import randint
+from random import randint, choice
 from abc import ABC, abstractmethod
 from math import sqrt, log
 from typing import TypeVar, List, Optional
@@ -76,7 +76,7 @@ class MCTSNode:
 
         self.max_children: int = 7
         self.s_children: int = 0
-        self.children = np.empty(self.max_children, dtype = np.object_)
+        self.children: np.ndarray = np.empty(self.max_children, dtype = np.object_)
 
         self.depth: int = 0 if parent is None else parent.depth + 1
         self.reward: float = 0
@@ -159,6 +159,17 @@ class MCTS:
         return node.action != None and node.terminal > -1
 
     @staticmethod
+    def _inverse_sigmoid(x: float) -> float:
+        if x == 1: return float("inf")
+        if x == 0: return -float("inf")
+        return log(x / (1 - x))
+
+    @staticmethod
+    def _convert_eval(value: float) -> float:
+        """The sigmoid function maps the real line to the interval [0,1], therefore it's inverse, which exists does the opposite."""
+        return MCTS._inverse_sigmoid(value)
+
+    @staticmethod
     def _convert_terminal(value: int) -> float:
         return -float("inf") if value == 0 else (0.5 if value == 0.5 else float("inf"))
 
@@ -172,7 +183,7 @@ class MCTS:
         for i in range(root.s_children):
             child: MCTSNode = root.children[i]
             value: float = (
-                1 - child.reward/child.visits
+                MCTS._convert_eval(1 - child.reward / child.visits)
                 if child.terminal == -1
                 else MCTS._convert_terminal(child.terminal)
             )
@@ -191,7 +202,7 @@ class MCTS:
             MCTS._expand(child, world)
 
         s_children: int = node.s_children
-        non_losing: List[MCTSNode] = []
+        non_losing: List[Action] = []
         for i in range(s_children):
             child: MCTSNode = node.children[i]
             if child.terminal == -1 or child.terminal > 0:
@@ -212,7 +223,6 @@ class MCTS:
     def _random_rollout(tree: MCTSNode, world: MCTSInterface, heuristic: tuple[bool, int], n: int = 100) -> None:
         """Performs a random rollout starting from the given tree."""
         assert n > 0, f"Invalid number of random rollouts: n = {n}"
-        player: int = world.get_current_player(tree.state)
 
         for _ in range(n):
             leafs: List[MCTSNode] = []
@@ -238,11 +248,22 @@ class MCTS:
         return node.reward / node.visits + c * sqrt(log(node.parent.visits) / node.visits)
 
     @staticmethod
-    def _select(node: MCTSNode, c: float) -> Optional[MCTSNode]:
+    def _select(node: MCTSNode, world: MCTSInterface, c: float) -> Optional[MCTSNode]:
         """Selects the best child node using the UCT formula."""
-        while node is not None and not node.is_leaf():
+        winning_children: List[Optional[MCTSNode]] = node.s_children * [None]
+        s_winning_children: int = 0
+        for i in range(node.s_children):
+            child: MCTSNode = node.children[i]
+            if child.terminal == 1:
+                winning_actions[s_winning_children] = child
+        if s_winning_children > 0:
+            return choice(winning_children[:s_winning_children])
+
+        while not node.is_leaf():
             non_terminal: np.ndarray[int] = node.get_non_terminal_children_idx()
-            assert non_terminal is not None
+            if non_terminal is None and len(non_terminal) == 0:
+                MCTS._print_node(node, world, c)
+                return None
 
             best_child_idx: int = non_terminal[0]
             best_score: float = MCTS._evaluate(node.children[best_child_idx], c)
@@ -305,9 +326,9 @@ class MCTS:
 
         while (not heuristic[0] or depth <= heuristic[1]) and (action is None or value == -1):
             actions: List[Action] = world.get_actions(state)
-            assert actions is not None
+            assert actions is not None and len(actions) > 0, world.print(state)
 
-            action = actions[randint(0, len(actions) - 1)]
+            action = choice(actions)
             state  = world.play(state, action)
 
             value  = world.value(state, action, player)
@@ -360,7 +381,7 @@ class MCTS:
     def _print_node(node: MCTSNode, world: MCTSInterface, c: float) -> None:
         eval_child = lambda child: (
             (
-                1 - child.reward/child.visits
+                MCTS._convert_eval(1 - child.reward / child.visits)
                 if child.visits > 0 else
                 -1
             )
@@ -391,28 +412,28 @@ class MCTS:
 
         print(f"Random rollout execution time: {timer_array[8]:.6f} seconds")
 
-        selection_avg_time_ms: float = timer_array[1] * 1e3
+        selection_avg_time: float = timer_array[1] * 1e6
         selection_total_time: float = timer_array[0] * timer_array[1]
         print(f"Selection execution time: ")
-        print(f"  - Average: {selection_avg_time_ms:.6f} ms")
+        print(f"  - Average: {selection_avg_time:.6f} μs")
         print(f"  - Total: {selection_total_time:.3f} seconds")
 
-        expansion_avg_time_ms: float = timer_array[2] * 1e3
+        expansion_avg_time: float = timer_array[2] * 1e6
         expansion_total_time: float = timer_array[0] * timer_array[2]
         print(f"Expansion execution time: ")
-        print(f"  - Average: {expansion_avg_time_ms:.6f} ms")
+        print(f"  - Average: {expansion_avg_time:.6f} μs")
         print(f"  - Total: {expansion_total_time:.3f} seconds")
 
-        rollout_avg_time_ms: float = timer_array[3] * 1e3
+        rollout_avg_time: float = timer_array[3] * 1e6
         rollout_total_time: float = timer_array[0] * timer_array[3]
         print(f"Rollout (max_depth = {max_depth}) execution time: ")
-        print(f"  - Average: {rollout_avg_time_ms:.6f} ms")
+        print(f"  - Average: {rollout_avg_time:.6f} μs")
         print(f"  - Total: {rollout_total_time:.3f} seconds")
 
         if rollout_timer is not None:
-            print(f"  - main loop: Average = {timer_array[4]:.6f} ms, Total = {timer_array[0] * timer_array[4]:.3f} s")
-            print(f"  - heuristic: Average = {timer_array[5]:.6f} ms, Total = {timer_array[0] * timer_array[5]:.3f} s")
-            print(f"  - backpropagation: Average = {timer_array[6]:.6f} ms, Total = {timer_array[0] * timer_array[6]:.3f} s")
+            print(f"  - main loop: Average = {(timer_array[4] * 1e6):.6f} μs, Total = {timer_array[0] * timer_array[4]:.3f} s")
+            print(f"  - heuristic: Average = {(timer_array[5] * 1e6):.6f} μs, Total = {timer_array[0] * timer_array[5]:.3f} s")
+            print(f"  - backpropagation: Average = {(timer_array[6] * 1e6):.6f} μs, Total = {timer_array[0] * timer_array[6]:.3f} s")
 
     @staticmethod
     async def mcts(
@@ -457,12 +478,14 @@ class MCTS:
             if timer:
                 start = default_timer()
 
-            node: MCTSNode = MCTS._select(tree, c)
+            node: MCTSNode = MCTS._select(tree, world, c)
+            if node == None:
+                break
+            if node.terminal == 1:
+                break
             if node.is_root():
                 MCTS._print_node(node, world, c)
                 assert False
-            if node == None:
-                break
 
             if timer:
                 elapsed_time = default_timer() - start
@@ -486,11 +509,15 @@ class MCTS:
             if timer:
                 elapsed_time = default_timer() - start
                 timer_array[3] = (timer_array[0] * timer_array[3] + elapsed_time) / (timer_array[0] + 1)
-                timer_array[0] += 1
 
                 if rollout_timer is not None:
                     for i in range(3):
-                        timer_array[4 + i] = (timer_array[0] * timer_array[4 + i] + rollout_timer[i + 1]) / (timer_array[0] + 1)
+                        n: float = rollout_timer[0] if i == 0 else 1
+                        timer_array[4 + i] = (
+                            (timer_array[0] * timer_array[4 + i] + n * rollout_timer[i + 1]) / (timer_array[0] + 1)
+                        )
+
+                timer_array[0] += 1
 
         if timer:
             MCTS._print_timer(timer_array, rollout_timer, max_depth)
