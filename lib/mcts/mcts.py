@@ -66,15 +66,16 @@ class MCTSNode:
     __slots__ = (
         'state', 'action', 'parent', 'children', 
         's_children', 'max_children',
-        'depth', 'reward', 'visits', 'terminal'
+        'depth', 'reward', 'visits', 'terminal', 's_t_actions', 't_actions'
     )
     
-    def __init__(self, state: State, action: Action, parent: Optional["MCTSNode"]) -> None:
+    def __init__(self, state: State, action: Action, parent: Optional["MCTSNode"], max_children: Optional[int] = None) -> None:
         self.state: State = state
         self.action: Action = action
         self.parent: Optional["MCTSNode"] = parent
 
-        self.max_children: int = 7
+        assert max_children is not None or parent is not None
+        self.max_children: int = max_children if parent is None else parent.max_children
         self.s_children: int = 0
         self.children: np.ndarray = np.empty(self.max_children, dtype = np.object_)
 
@@ -82,6 +83,8 @@ class MCTSNode:
         self.reward: float = 0
         self.visits: int = 0
         self.terminal: float = -1
+        self.s_t_actions: int = -1
+        self.t_actions: List[Action] = []
     
     def is_root(self) -> bool:
         return self.parent is None
@@ -151,8 +154,8 @@ class MCTSNode:
 
 class MCTS:
     @staticmethod
-    def _encapsulate(state: State, action: Action) -> MCTSNode:
-        return MCTSNode(state, action, None)
+    def _encapsulate(state: State, action: Action, max_expansion: int) -> MCTSNode:
+        return MCTSNode(state, action, None, max_expansion)
 
     @staticmethod
     def _is_terminal_state(node: MCTSNode) -> bool:
@@ -171,68 +174,105 @@ class MCTS:
 
     @staticmethod
     def _convert_terminal(value: int) -> float:
-        return -float("inf") if value == 0 else (0.5 if value == 0.5 else float("inf"))
+        return -float("inf") if value == 0 else (0 if value == 0.5 else float("inf"))
+
+
+    @staticmethod
+    def _sort_children(root: MCTSNode) -> None:
+        eval = lambda node: (
+            (
+                MCTS._convert_eval(node.reward / node.visits)
+                if node.visits > 0
+                else 1000
+            )
+            if node.terminal == -1
+            else MCTS._convert_terminal(node.terminal)
+        )
+
+        for i in range(1, root.s_children):
+            key_node: MCTSNode = root.children[i]
+            key_value: float = eval(key_node)
+            j: int = i - 1
+
+            while j >= 0:
+                j_node: MCTSNode = root.children[j]
+                j_value: float = eval(j_node) 
+
+                if key_value <= j_value:
+                    break
+
+                root.children[j + 1] = root.children[j]
+                j -= 1
+
+            root.children[j + 1] = key_node
 
     @staticmethod
     def _pick_action(root: MCTSNode) -> Action:
         assert not root.is_leaf()
+        return root.children[0].action
 
-        best_child: Optional[MCTSNode] = None
-        best_value: float = -float("inf")
-
-        for i in range(root.s_children):
-            child: MCTSNode = root.children[i]
-            value: float = (
-                MCTS._convert_eval(1 - child.reward / child.visits)
-                if child.terminal == -1
-                else MCTS._convert_terminal(child.terminal)
-            )
-            if value > best_value:
-                best_child = child
-                best_value = value
-
-        return best_child.action
+        # best_child: Optional[MCTSNode] = None
+        # best_value: float = -float("inf")
+# 
+        # for i in range(root.s_children):
+            # child: MCTSNode = root.children[i]
+            # value: float = (
+                # MCTS._convert_eval(child.reward / child.visits)
+                # if child.terminal == -1
+                # else MCTS._convert_terminal(child.terminal)
+            # )
+            # if value > best_value:
+                # best_child = child
+                # best_value = value
+# 
+        # return best_child.action
 
     @staticmethod
     def _only_action(node: MCTSNode, world: MCTSInterface, c: float) -> Action:
-        if node is None:
-            return None
+        assert node is not None
 
         for child in node.get_children():
             MCTS._expand(child, world)
 
         s_children: int = node.s_children
-        non_losing: List[Action] = []
+        s_non_losing: int = 0
+        index: int = 0
+
         for i in range(s_children):
             child: MCTSNode = node.children[i]
             if child.terminal == -1 or child.terminal > 0:
-                non_losing.append(child.action)
+                s_non_losing += 1
+                index = i
 
-        s_non_losing: int = len(non_losing)
+        if s_non_losing > 1:
+            return None
         if s_non_losing == 1:
-            return non_losing[0]
-        elif s_non_losing == 0:
-            actions: List[Action] = []
-            for i in range(s_children):
-                actions.append(node.children[i].action)
-            return actions[randint(0, s_children - 1)]
-
-        return None
+            return node.children[index].action
+        return node.children[randint(0, s_children - 1)].action
 
     @staticmethod
     def _random_rollout(tree: MCTSNode, world: MCTSInterface, heuristic: tuple[bool, int], n: int = 100) -> None:
         """Performs a random rollout starting from the given tree."""
         assert n > 0, f"Invalid number of random rollouts: n = {n}"
 
+        max_leafs: int = tree.max_children ** 2
+        leafs: np.ndarray[MCTSNode] = np.ndarray(max_leafs, dtype = np.object_)
         for _ in range(n):
-            leafs: List[MCTSNode] = []
+            s_leafs: int = 0
+
             for leaf in tree.get_leafs():
-                if not MCTS._is_terminal_state(leaf):
-                    leafs.append(leaf)
-            if leafs == []:
+                if MCTS._is_terminal_state(leaf):
+                    continue
+                if s_leafs >= max_leafs:
+                    max_leafs *= 2
+                    leafs.resize(max_leafs)
+                leafs[s_leafs] = leaf
+                s_leafs += 1
+
+            if s_leafs == 0:
                 break
 
-            node: MCTSNode = leafs[randint(0, len(leafs) - 1)]
+            node: MCTSNode = leafs[randint(0, s_leafs - 1)]
             if not MCTS._expand(node, world):
                 continue
 
@@ -250,15 +290,6 @@ class MCTS:
     @staticmethod
     def _select(node: MCTSNode, world: MCTSInterface, c: float) -> Optional[MCTSNode]:
         """Selects the best child node using the UCT formula."""
-        winning_children: List[Optional[MCTSNode]] = node.s_children * [None]
-        s_winning_children: int = 0
-        for i in range(node.s_children):
-            child: MCTSNode = node.children[i]
-            if child.terminal == 1:
-                winning_actions[s_winning_children] = child
-        if s_winning_children > 0:
-            return choice(winning_children[:s_winning_children])
-
         while not node.is_leaf():
             non_terminal: np.ndarray[int] = node.get_non_terminal_children_idx()
             if non_terminal is None and len(non_terminal) == 0:
@@ -321,7 +352,7 @@ class MCTS:
         state: State   = world.copy(leaf.state)
         action: Action = None
         value: float   = None
-        player: int    = world.get_current_player(state)
+        player: int    = world.get_current_player(leaf.parent.state)
         depth: int     = leaf.depth
 
         while (not heuristic[0] or depth <= heuristic[1]) and (action is None or value == -1):
@@ -368,9 +399,17 @@ class MCTS:
         """Backpropagates the terminal value from the a node up to the root."""
         assert node != None
         assert 0 <= terminal <= 1
+        s_actions: int = 0
+        action_seq: List[Action] = []
 
         while node != None and (terminal == 0 or not node.has_undetermined_child()):
-            node.terminal = terminal
+            node.terminal    = terminal
+            node.s_t_actions = s_actions
+            node.t_actions = action_seq
+
+            s_actions += 1
+            action_seq.append(node.action)
+
             if node.s_children > 0 and node.depth > 0:
                 node.remove_children()
 
@@ -381,28 +420,33 @@ class MCTS:
     def _print_node(node: MCTSNode, world: MCTSInterface, c: float) -> None:
         eval_child = lambda child: (
             (
-                MCTS._convert_eval(1 - child.reward / child.visits)
+                MCTS._convert_eval(child.reward / child.visits)
                 if child.visits > 0 else
-                -1
+                float("inf")
             )
-            if child.terminal == -1 else
-            (
-                MCTS._convert_terminal(child.terminal)
-                if MCTS._convert_terminal(child.terminal) != 0.5
-                else 0.5
-            )
+            if child.terminal == -1 
+            else MCTS._convert_terminal(child.terminal)
         )
 
         print("Node {")
         print(f"  depth = {node.depth},")
         print(f"  visits = {node.visits},")
-        print(F"  terminal = {node.terminal}")
+        print(f"  terminal = {node.terminal},")
+        print(f"  s_t_actions = {node.s_t_actions},")
+
+        actions: List[Action] = (
+            [] 
+            if node.s_t_actions == -1
+            else node.t_actions[:node.s_t_actions - 1].reverse()
+        )
+
+        print(f"""  t_actions = {actions},""")
         print("  state =")
         world.print(node.state)
 
         print("  Children: {")
         for child in sorted(node.get_children(), key = eval_child, reverse = True):
-            print(f"    action: {child.action}, visits: {child.visits}, value: {eval_child(child):.3f}")
+            print(f"    action: {child.action}, visits: {child.visits}, value: {eval_child(child):.3f}, terminal: {child.terminal}")
         print("  }\n}")
 
     @staticmethod
@@ -437,7 +481,7 @@ class MCTS:
 
     @staticmethod
     async def mcts(
-        state: State, world: MCTSInterface, s_rollout: int,
+        state: State, world: MCTSInterface, s_rollout: int, max_expansion: int = 10,
         s_initial_rollout: int = 100, c: float = round(sqrt(2), 3),
         debug: bool = False, timer: bool = False, heuristic: tuple[bool, int] = (False, None)
     ) -> Action:
@@ -446,22 +490,24 @@ class MCTS:
         if timer:
             start = default_timer()
             timer_array: List[float] = 9 * [0]
+            rollout_timer: List[float] = 4 * [0]
 
-        tree: MCTSNode = MCTS._encapsulate(state, None)
+        tree: MCTSNode = MCTS._encapsulate(state, None, max_expansion)
         MCTS._expand(tree, world)
+        MCTS._sort_children(tree)
 
-        winning_actions: List[Action] = []
-        for i in range(tree.s_children):
-            child: MCTSNode = tree.children[i]
-            if child.terminal == 1:
-                winning_actions.append(child.action)
+        # winning_actions: List[Action] = []
+        # for i in range(tree.s_children):
+            # child: MCTSNode = tree.children[i]
+            # if child.terminal == 1:
+                # winning_actions.append(child.action)
 
-        if winning_actions != []:
+        if tree.children[0].terminal == 1:
             if debug:
                 print("Left winning_actions")
                 MCTS._print_node(tree, world, c)
 
-            return winning_actions[0]
+            return tree.children[0].action
         
         if (only_action := MCTS._only_action(tree, world, c)) != None:
             if debug:
@@ -477,6 +523,10 @@ class MCTS:
         for _ in range(s_rollout):
             if timer:
                 start = default_timer()
+
+            MCTS._sort_children(tree)
+            if tree.children[0].terminal == 1:
+                break
 
             node: MCTSNode = MCTS._select(tree, world, c)
             if node == None:

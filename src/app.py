@@ -188,6 +188,13 @@ def draw_game(app: App, state: Connect4Board) -> None:
                 base_rect.x + j * (s_col + 1) + s_col // 2, base_rect.y + i * s_row + s_row // 2
             )
             pygame.draw.circle(app.window.window, color, center, radius)
+            if color != (147, 175, 174):
+                pygame.draw.circle(
+                    app.window.window, 
+                    (color[0] * 0.90, color[1] * 0.90, color[2] * 0.90), 
+                    center, 
+                    radius * 0.85
+                )
 
     mouse_x, _ = pygame.mouse.get_pos()
     center: tuple[int, int] = (
@@ -202,6 +209,12 @@ def draw_game(app: App, state: Connect4Board) -> None:
     )
     color = (242, 233, 78) if state.player == 1 else (218, 62, 82)
     pygame.draw.circle(app.window.window, color, center, radius)
+    pygame.draw.circle(
+        app.window.window, 
+        (color[0] * 0.90, color[1] * 0.90, color[2] * 0.90), 
+        center, 
+        radius * 0.85
+    )
 
 def player_action(app: App, state: Connect4Board) -> int:
     cols: int  = state.cols
@@ -233,12 +246,26 @@ async def pick_action(app: App, state: Connect4Board) -> int:
                 action = player_action(app, state)
             elif state.player == 2 and app.opponent == 1:
                 mcts_choice = asyncio.create_task(
-                    MCTS.mcts(state, Connect4, int(1e5), 7, debug = True, timer = True)
+                    MCTS.mcts(
+                        state = state, 
+                        world = Connect4, 
+                        s_rollout = int(1e5), 
+                        max_expansion = 7, 
+                        debug = True,
+                        timer = True
+                    )
                 )
                 action = await mcts_choice
         case 3:
-            mcts_choice = await asyncio.create_task(
-                MCTS.mcts(state, Connect4, int(1e5), 7, debug = True, timer = False)
+            mcts_choice = asyncio.create_task(
+                MCTS.mcts(
+                    state = state, 
+                    world = Connect4, 
+                    s_rollout = int(1e5), 
+                    max_expansion = 7, 
+                    debug = True,
+                    timer = False
+                )
             )
             action = await mcts_choice
     return action
@@ -282,13 +309,15 @@ async def main() -> None:
             )
 
             if app.in_game:
+                draw_game(app, state)
+                pygame.display.flip()
+
                 current_task = asyncio.create_task(game(app, state))
                 state, result = await current_task
                 app.in_game = result == 0
                 current_task = None
 
                 app.mouse_click = None
-                draw_game(app, state)
 
             else:
                 if result == 2:
@@ -303,17 +332,19 @@ async def main() -> None:
                 else:
                     outcome = 0
                     app.gamemode = 0
+                    app.opponent = 0
 
                 result = 0
+                pygame.display.flip()
 
         else:
             if app.gamemode == 0:
                 app.gamemode = draw_menu(app)
                 app.game_start = app.gamemode > 0
-            else:
+            elif app.opponent == 0:
                 app.opponent = pick_opponnent(app) if app.gamemode > 1 else 1
             app.mouse_click = None
 
-        pygame.display.flip()
+            pygame.display.flip()
 
     pygame.quit()

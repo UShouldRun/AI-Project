@@ -135,8 +135,9 @@ class Connect4(MCTSInterface):
 
     @staticmethod
     def print(state: Connect4Board) -> None:
+        print(f"    player = {state.player}")
         for row in range(state.rows):
-            print("  [", end = "")
+            print("    [", end = "")
             for col in range(state.cols):
                 print(state.get_piece(row, col), " " if col < state.cols - 1 else "", end = "")
             print("]")

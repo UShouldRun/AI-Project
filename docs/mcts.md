@@ -1,120 +1,218 @@
-# Monte Carlo Tree Search (MCTS) Library Documentation
+# Connect4 Implementation Documentation
 
 ## Overview
 
-This library implements Monte Carlo Tree Search (MCTS), a heuristic search algorithm for decision processes. MCTS combines tree search with random sampling to evaluate actions and build a search tree. It's particularly effective for domains with large branching factors, such as board games.
-
-The implementation uses the UCT (Upper Confidence Bound for Trees) formula for node selection and provides an abstract interface for problem-specific implementations.
+This implementation of Connect4 serves as a concrete example of applying the MCTS (Monte Carlo Tree Search) algorithm to a classic board game. Connect4 is implemented as a 2-player game where players alternate placing pieces into a vertical grid, aiming to connect four pieces horizontally, vertically, or diagonally.
 
 ## Components
 
-### MCTSInterface (Abstract Base Class)
+### Connect4Board
 
-`MCTSInterface` is an abstract class that must be implemented for any domain-specific problem to use the MCTS algorithm. It defines the required methods for:
+The `Connect4Board` class represents the game state using bit boards for efficient representation and operations.
 
-- State transitions
-- Action generation
-- Terminal state detection
-- Value evaluation
-- Heuristic evaluation
-- Player management
-- State manipulation and display
+#### Properties
 
-#### Required Methods
+| Property | Type | Description |
+|----------|------|-------------|
+| `player` | int | Current player (1 or 2) |
+| `rows` | int | Number of rows in the board |
+| `cols` | int | Number of columns in the board |
+| `board1` | int | Bit board for player 1's pieces |
+| `board2` | int | Bit board for player 2's pieces |
+| `heights` | List[int] | Current height of each column |
 
-| Method | Description |
-|--------|-------------|
-| `play(state, action)` | Executes an action on a state and returns the resulting state |
-| `get_actions(state)` | Returns a list of valid actions for the given state |
-| `is_terminal_state(state, action)` | Checks if a state is terminal (no further actions possible) |
-| `value(state, action, player=None)` | Returns the value of a state (should be in [0,1]) |
-| `heuristic(state, player)` | Returns a heuristic evaluation of a state (should be in [0,1]) |
-| `get_current_player(state)` | Returns the current player for the given state |
-| `reverse_player(player)` | Returns the opponent of the given player |
-| `copy(state)` | Creates a deep copy of the given state |
-| `print(state)` | Displays the state in a human-readable format |
-
-### MCTSNode
-
-`MCTSNode` represents a node in the MCTS search tree. Each node contains:
-
-- Current state
-- Action that led to this state
-- Parent node reference
-- Child nodes
-- Statistics (visits, rewards)
-- Terminal state flag
-
-#### Key Methods
+#### Methods
 
 | Method | Description |
 |--------|-------------|
-| `is_root()` | Checks if this node is the root of the tree |
-| `is_leaf()` | Checks if this node has no children |
-| `has_undetermined_child()` | Checks if any child has unknown terminal status |
-| `add_child(child)` | Adds a child node |
-| `remove_children()` | Removes all children |
-| `get_children()` | Returns an array of child nodes |
-| `get_non_terminal_children_idx()` | Returns indices of non-terminal children |
-| `get_leafs()` | Returns all leaf nodes in the subtree |
+| `place_piece(player, row, col)` | Places a piece for the given player at the specified position |
+| `get_piece(row, col)` | Returns the player (1 or 2) whose piece is at the given position, or 0 if empty |
 
-### MCTS (Main Algorithm)
+### Connect4 (MCTSInterface Implementation)
 
-The `MCTS` class implements the core algorithm with the following key steps:
+`Connect4` implements the `MCTSInterface` to provide the game-specific logic for the MCTS algorithm.
 
-1. **Selection**: Navigate the tree from root to leaf using UCT formula
-2. **Expansion**: Generate child nodes for unexplored actions
-3. **Simulation**: Perform random rollouts to estimate state value
-4. **Backpropagation**: Update statistics back up the tree
+#### Methods
 
-#### Main Method
+##### State Transitions
 
 ```python
-async def mcts(
-    state, world, s_rollout, s_initial_rollout=100, 
-    c=round(sqrt(2), 3), debug=False, timer=False, 
-    heuristic=(False, None)
-) -> Action
+@staticmethod
+def play(state: Connect4Board, action: int) -> Connect4Board
+```
+Executes a move (placing a piece in a column) and returns the updated board state.
+
+##### Action Generation
+
+```python
+@staticmethod
+def get_actions(state: Connect4Board) -> List[int]
+```
+Returns a list of valid columns where a piece can be placed (not full).
+
+##### Terminal State Detection
+
+```python
+@staticmethod
+def is_terminal_state(state: Connect4Board, action: int) -> bool
+```
+Checks if the game has ended after the given action. This integrates with MCTS's terminal state tracking feature.
+
+##### Value Evaluation
+
+```python
+@staticmethod
+def value(state: Connect4Board, action: int, player: Optional[int] = None) -> float
+```
+Returns:
+- `-1` if game is not over
+- `0.5` for a draw (represented as `1` in internal implementation, scaled to `0.5`)
+- `0` or `1` for a loss or win (relative to the current player or specified player)
+
+This method is critical for MCTS's terminal state detection and propagation, as it identifies winning, losing, and draw states.
+
+##### Heuristic Evaluation
+
+```python
+@staticmethod
+def heuristic(state: Connect4Board, player: int) -> float
+```
+Evaluates the board position using pattern recognition:
+- Counts sequences of pieces (1, 2, 3, or 4 in a row)
+- Assigns different weights based on sequence length and whether opposing pieces block
+- Normalizes the result to [0,1]
+
+Used by MCTS rollouts when a terminal state isn't reached but evaluation is needed.
+
+##### Pattern Evaluation
+
+```python
+@staticmethod
+def evaluate_line(line: List[int], player: int) -> int
+```
+Evaluates a line of 4 consecutive positions:
+- +100 for 4-in-a-row (win)
+- +10 for 3-in-a-row with an empty space
+- +1 for 2-in-a-row with two empty spaces
+- Negative values for opponent's sequences
+
+##### Player Management
+
+```python
+@staticmethod
+def get_current_player(state: Connect4Board) -> int
+```
+Returns the current player (1 or 2).
+
+```python
+@staticmethod
+def reverse_player(player: int) -> int
+```
+Returns the opponent of the given player.
+
+##### State Manipulation
+
+```python
+@staticmethod
+def copy(state: Connect4Board) -> Connect4Board
+```
+Creates a deep copy of the board state.
+
+```python
+@staticmethod
+def print(state: Connect4Board) -> None
+```
+Displays the board in a human-readable format.
+
+##### Helper Methods
+
+```python
+@staticmethod
+def init_board(rows: int, cols: int) -> Connect4Board
+```
+Creates a new Connect4 board with the specified dimensions.
+
+```python
+@staticmethod
+def action_get_row(state: Connect4Board, col: int) -> int
+```
+Determines which row a piece will land in when dropped in a given column.
+
+```python
+@staticmethod
+def is_out_of_bounds(state: Connect4Board, row: int, col: int) -> bool
+```
+Checks if a position is outside the board boundaries.
+
+```python
+@staticmethod
+def check_result(state: Connect4Board, action: int) -> int
+```
+Checks if the last action resulted in a win, draw, or ongoing game:
+- `0` if the game is ongoing
+- `1` for a draw
+- `2` for a win
+
+This method is used by the `value` method to detect terminal states.
+
+```python
+@staticmethod
+def count_in_direction(state: Connect4Board, start_row: int, start_col: int, drow: int, dcol: int, player: int) -> int
+```
+Counts consecutive pieces of a player in a specific direction from a starting position.
+
+## Terminal State Handling
+
+The Connect4 implementation integrates with MCTS's terminal state handling capabilities:
+
+1. The `value` method returns:
+   - `-1` for non-terminal states
+   - Values in `[0,1]` for terminal states
+
+2. The `check_result` method identifies:
+   - Wins by checking for 4-in-a-row in all directions
+   - Draws by checking if the top row is full
+   - Ongoing games otherwise
+
+This allows MCTS to:
+- Quickly identify winning moves
+- Avoid losing moves when possible
+- Track and store optimal action sequences
+- Efficiently prune the search tree
+
+## Performance Considerations
+
+The implementation uses bit boards (`board1` and `board2`) to represent the game state efficiently. This approach:
+
+1. Reduces memory usage
+2. Speeds up move generation and validation
+3. Makes copying game states faster
+4. Enables efficient pattern detection
+
+## Usage with MCTS
+
+To use this Connect4 implementation with the MCTS algorithm:
+
+```python
+from lib.mcts import MCTS
+from lib.connect4 import Connect4, Connect4Board
+
+# Create initial board
+board = Connect4.init_board(6, 7)  # Standard Connect4 dimensions
+
+# Run MCTS to find the best move
+best_move = await MCTS.mcts(
+    state=board,
+    world=Connect4,
+    s_rollout=1000,        # Number of simulations
+    max_expansion=10,      # Maximum children per node
+    s_initial_rollout=100, # Initial random rollouts
+    c=1.41,                # Exploration parameter
+    heuristic=(True, 20)   # Use heuristic evaluation with max depth 20
+)
+
+# Make the move
+new_board = Connect4.play(board, best_move)
 ```
 
-Parameters:
-- `state`: Initial state
-- `world`: Implementation of MCTSInterface
-- `s_rollout`: Number of rollouts to perform
-- `s_initial_rollout`: Number of initial random rollouts
-- `c`: Exploration parameter for UCT formula (default: √2)
-- `debug`: Enable debug output
-- `timer`: Enable performance timing
-- `heuristic`: Tuple of (use_heuristic, max_depth)
-
-Returns the best action according to the search.
-
-## Helper Methods
-
-The MCTS class includes various helper methods for:
-
-- Node evaluation using UCT formula
-- Terminal state detection and propagation
-- Converting evaluations between different ranges
-- Selecting optimal actions
-- Debugging and visualization
-
-## Performance Optimization
-
-The implementation uses NumPy arrays for efficient data storage and manipulation. The code includes timing capabilities to measure the performance of different algorithm phases:
-
-- Selection
-- Expansion
-- Simulation (rollout)
-- Backpropagation
-
-## Usage
-
-To use this library:
-
-1. Implement the `MCTSInterface` for your specific problem domain
-2. Create an initial state
-3. Call `MCTS.mcts()` with appropriate parameters
-4. Apply the returned action to your game/problem
-
-The library handles automatic memory management, efficient tree traversal, and statistical tracking for the search process.
+The MCTS algorithm will build a search tree to find the most promising move, using the Connect4 implementation to simulate game play and evaluate positions, with special handling for terminal states to optimize search efficiency.
