@@ -7,7 +7,7 @@ from timeit import default_timer
 import numpy as np
 import asyncio
 
-State = TypeVar("State")
+State  = TypeVar("State")
 Action = TypeVar("Action")
 
 class MCTSInterface(ABC):
@@ -84,7 +84,6 @@ class MCTSNode:
         self.visits: int = 0
         self.terminal: float = -1
         self.s_t_actions: int = -1
-        self.t_actions: List[Action] = []
     
     def is_root(self) -> bool:
         return self.parent is None
@@ -110,22 +109,10 @@ class MCTSNode:
         """Get the actual children (not the empty slots)."""
         return self.children[:self.s_children]
 
-    def get_non_terminal_children_idx(self) -> np.ndarray[int]:
-        non_terminal: np.ndarray[int] = np.empty(
-            self.s_children, dtype = np.object_
-        )
-        s_non_terminal: int = 0
-        for i in range(self.s_children):
-            child = self.children[i]
-            if child.terminal == -1:
-                non_terminal[s_non_terminal] = i
-                s_non_terminal += 1
-        return non_terminal[:s_non_terminal]
-    
     def get_leafs(self) -> np.ndarray["MCTSNode"]:
         capacity: int = 32
-        result: np.ndarray["MCTSNode"] = np.empty(capacity, dtype=object)
-        stack: np.ndarray["MCTSNode"] = np.empty(capacity, dtype=object)
+        result: np.ndarray["MCTSNode"] = np.empty(capacity, dtype = object)
+        stack: np.ndarray["MCTSNode"] = np.empty(capacity, dtype = object)
 
         result_size: int = 0
         stack_size: int = 1
@@ -176,7 +163,6 @@ class MCTS:
     def _convert_terminal(value: int) -> float:
         return -float("inf") if value == 0 else (0 if value == 0.5 else float("inf"))
 
-
     @staticmethod
     def _sort_children(root: MCTSNode) -> None:
         eval = lambda node: (
@@ -210,22 +196,6 @@ class MCTS:
     def _pick_action(root: MCTSNode) -> Action:
         assert not root.is_leaf()
         return root.children[0].action
-
-        # best_child: Optional[MCTSNode] = None
-        # best_value: float = -float("inf")
-# 
-        # for i in range(root.s_children):
-            # child: MCTSNode = root.children[i]
-            # value: float = (
-                # MCTS._convert_eval(child.reward / child.visits)
-                # if child.terminal == -1
-                # else MCTS._convert_terminal(child.terminal)
-            # )
-            # if value > best_value:
-                # best_child = child
-                # best_value = value
-# 
-        # return best_child.action
 
     @staticmethod
     def _only_action(node: MCTSNode, world: MCTSInterface, c: float) -> Action:
@@ -265,7 +235,7 @@ class MCTS:
                     continue
                 if s_leafs >= max_leafs:
                     max_leafs *= 2
-                    leafs.resize(max_leafs)
+                    leafs = np.resize(leafs, max_leafs)
                 leafs[s_leafs] = leaf
                 s_leafs += 1
 
@@ -283,24 +253,27 @@ class MCTS:
     def _evaluate(node: MCTSNode, c: float) -> float:
         """Evaluates a node using the UCT formula."""
         assert node.parent != None and not MCTS._is_terminal_state(node)
-        if node.visits <= 0 or node.parent.visits < 1:
-            return float("inf")
-        return node.reward / node.visits + c * sqrt(log(node.parent.visits) / node.visits)
+        return node.reward / node.visits + c * sqrt(log(node.parent.visits) / node.visits) \
+            if node.visits > 0 and node.parent.visits >= 1\
+            else float("inf")
 
     @staticmethod
     def _select(node: MCTSNode, world: MCTSInterface, c: float) -> Optional[MCTSNode]:
         """Selects the best child node using the UCT formula."""
         while not node.is_leaf():
-            non_terminal: np.ndarray[int] = node.get_non_terminal_children_idx()
-            if non_terminal is None and len(non_terminal) == 0:
-                MCTS._print_node(node, world, c)
-                return None
+            best_child_idx: int = 0
+            while node.children[best_child_idx].terminal != -1:
+                best_child_idx += 1
+                if best_child_idx >= node.s_children:
+                    return None
 
-            best_child_idx: int = non_terminal[0]
             best_score: float = MCTS._evaluate(node.children[best_child_idx], c)
             
-            for idx in non_terminal[1:]:
+            for idx in range(best_child_idx + 1, node.s_children):
                 child: MCTSNode = node.children[idx]
+                if child.terminal != -1:
+                    continue
+
                 score: float = MCTS._evaluate(child, c)
                 if score > best_score:
                     best_score = score
@@ -326,10 +299,10 @@ class MCTS:
 
             child.terminal = world.value(child.state, child.action)
             if child.terminal == 1:
-                max_terminal = 1
-                break
-            if child.terminal > -1:
-                max_terminal = max(max_terminal, child.terminal)
+                MCTS._backpropagate_terminal(node, 0)
+                return False
+
+            max_terminal = max(max_terminal, child.terminal)
 
         if max_terminal > -1:
             MCTS._backpropagate_terminal(node, 1 - max_terminal)
@@ -343,44 +316,37 @@ class MCTS:
         """Simulates a random rollout from the given leaf node."""
         assert leaf != None and leaf.is_leaf(), f"leaf: {leaf}"
         assert not MCTS._is_terminal_state(leaf)
-        times = None
 
-        if timer:
-            start = default_timer()
-            times = 4 * [0]
+        # times: Optional[List[float]] = None
+        # if timer:
+        # start = default_timer()
+        # times = 3 * [0]
 
-        state: State   = world.copy(leaf.state)
+        state:  State  = world.copy(leaf.state)
         action: Action = None
-        value: float   = None
+        value:  float  = -1
         player: int    = world.get_current_player(leaf.parent.state)
-        depth: int     = leaf.depth
+        depth:  int    = leaf.depth
 
-        while (not heuristic[0] or depth <= heuristic[1]) and (action is None or value == -1):
-            actions: List[Action] = world.get_actions(state)
-            assert actions is not None and len(actions) > 0, world.print(state)
-
-            action = choice(actions)
+        while (not heuristic[0] or depth <= heuristic[1]) and value == -1:
+            action = choice(world.get_actions(state))
             state  = world.play(state, action)
-
             value  = world.value(state, action, player)
             depth += 1
 
-            if timer:
-                times[1] = (times[0] * times[1] + default_timer() - start) / (times[0] + 1)
-                times[0] += 1
-                start = default_timer()
+            # if timer:
+            # times[1] = (times[0] * times[1] + default_timer() - start) / (times[0] + 1)
+            # times[0] += 1
+            # start = default_timer()
 
-        if value is None or value == -1:
+        if value == -1:
             value = world.heuristic(leaf.state, player)
-            if timer:
-                times[2] = default_timer() - start
-                start = default_timer()
 
         MCTS._backpropagate(leaf, value)
-        if timer:
-            times[3] = default_timer() - start
+        # if timer:
+        # times[2] = default_timer() - start
 
-        return depth, times
+        return depth, None 
 
     @staticmethod
     def _backpropagate(node: MCTSNode, reward: float) -> None:
@@ -400,15 +366,11 @@ class MCTS:
         assert node != None
         assert 0 <= terminal <= 1
         s_actions: int = 0
-        action_seq: List[Action] = []
 
         while node != None and (terminal == 0 or not node.has_undetermined_child()):
             node.terminal    = terminal
             node.s_t_actions = s_actions
-            node.t_actions = action_seq
-
             s_actions += 1
-            action_seq.append(node.action)
 
             if node.s_children > 0 and node.depth > 0:
                 node.remove_children()
@@ -434,13 +396,6 @@ class MCTS:
         print(f"  terminal = {node.terminal},")
         print(f"  s_t_actions = {node.s_t_actions},")
 
-        actions: List[Action] = (
-            [] 
-            if node.s_t_actions == -1
-            else node.t_actions[:node.s_t_actions - 1].reverse()
-        )
-
-        print(f"""  t_actions = {actions},""")
         print("  state =")
         world.print(node.state)
 
@@ -476,31 +431,25 @@ class MCTS:
 
         if rollout_timer is not None:
             print(f"  - main loop: Average = {(timer_array[4] * 1e6):.6f} μs, Total = {timer_array[0] * timer_array[4]:.3f} s")
-            print(f"  - heuristic: Average = {(timer_array[5] * 1e6):.6f} μs, Total = {timer_array[0] * timer_array[5]:.3f} s")
-            print(f"  - backpropagation: Average = {(timer_array[6] * 1e6):.6f} μs, Total = {timer_array[0] * timer_array[6]:.3f} s")
+            print(f"  - backpropagation: Average = {(timer_array[5] * 1e6):.6f} μs, Total = {timer_array[0] * timer_array[5]:.3f} s")
 
     @staticmethod
     async def mcts(
         state: State, world: MCTSInterface, s_rollout: int, max_expansion: int = 10,
         s_initial_rollout: int = 100, c: float = round(sqrt(2), 3),
-        debug: bool = False, timer: bool = False, heuristic: tuple[bool, int] = (False, None)
+        debug: bool = False, timer: bool = False, heuristic: tuple[bool, Optional[int]] = (False, None)
     ) -> Action:
         """Performs the Monte Carlo Tree Search and returns the best action."""
 
         if timer:
             start = default_timer()
-            timer_array: List[float] = 9 * [0]
-            rollout_timer: List[float] = 4 * [0]
+            # timer_array: List[float] = 9 * [0]
+            # rollout_timer: List[float] = 4 * [0]
 
         tree: MCTSNode = MCTS._encapsulate(state, None, max_expansion)
         MCTS._expand(tree, world)
         MCTS._sort_children(tree)
-
-        # winning_actions: List[Action] = []
-        # for i in range(tree.s_children):
-            # child: MCTSNode = tree.children[i]
-            # if child.terminal == 1:
-                # winning_actions.append(child.action)
+        MCTS._print_node(tree, world, c)
 
         if tree.children[0].terminal == 1:
             if debug:
@@ -516,13 +465,13 @@ class MCTS:
             return only_action
         
         MCTS._random_rollout(tree, world, heuristic, s_initial_rollout)
-        if timer:
-            timer_array[8] = default_timer() - start
+        # if timer:
+        # timer_array[8] = default_timer() - start
 
         max_depth: int = 0
         for _ in range(s_rollout):
-            if timer:
-                start = default_timer()
+            # if timer:
+            # start = default_timer()
 
             MCTS._sort_children(tree)
             if tree.children[0].terminal == 1:
@@ -533,44 +482,42 @@ class MCTS:
                 break
             if node.terminal == 1:
                 break
-            if node.is_root():
-                MCTS._print_node(node, world, c)
-                assert False
 
-            if timer:
-                elapsed_time = default_timer() - start
-                timer_array[1] = (timer_array[0] * timer_array[1] + elapsed_time) / (timer_array[0] + 1)
-                start = default_timer()
+                # if timer:
+                # elapsed_time = default_timer() - start
+                # timer_array[1] = (timer_array[0] * timer_array[1] + elapsed_time) / (timer_array[0] + 1)
+                # start = default_timer()
 
             if node.visits > 0:
                 expansion: bool = MCTS._expand(node, world)
-                if timer:
-                    elapsed_time = default_timer() - start
-                    timer_array[2] = (timer_array[0] * timer_array[2] + elapsed_time) / (timer_array[0] + 1)
-                    start = default_timer()
+                # if timer:
+                # elapsed_time = default_timer() - start
+                # timer_array[2] = (timer_array[0] * timer_array[2] + elapsed_time) / (timer_array[0] + 1)
+                # start = default_timer()
 
                 if not expansion:
                     continue
                 node = node.children[randint(0, node.s_children - 1)]
 
-            depth, rollout_timer = MCTS._rollout(node, world, heuristic, timer = True and timer)
+            depth, _ = MCTS._rollout(node, world, heuristic, timer = False and timer)
             max_depth = max(max_depth, depth)
 
-            if timer:
-                elapsed_time = default_timer() - start
-                timer_array[3] = (timer_array[0] * timer_array[3] + elapsed_time) / (timer_array[0] + 1)
-
-                if rollout_timer is not None:
-                    for i in range(3):
-                        n: float = rollout_timer[0] if i == 0 else 1
-                        timer_array[4 + i] = (
-                            (timer_array[0] * timer_array[4 + i] + n * rollout_timer[i + 1]) / (timer_array[0] + 1)
-                        )
-
-                timer_array[0] += 1
+            # if timer:
+            # elapsed_time = default_timer() - start
+            # timer_array[3] = (timer_array[0] * timer_array[3] + elapsed_time) / (timer_array[0] + 1)
+            # 
+            # if rollout_timer is not None:
+            # for i in range(2):
+            # n: float = rollout_timer[0] if i == 0 else 1
+                # timer_array[4 + i] = (
+                # (timer_array[0] * timer_array[4 + i] + n * rollout_timer[i + 1]) / (timer_array[0] + 1)
+            # )
+            # 
+            # timer_array[0] += 1
 
         if timer:
-            MCTS._print_timer(timer_array, rollout_timer, max_depth)
+            print(f"Total execution time: {(default_timer() - start):.3f} seconds")
+            # MCTS._print_timer(timer_array, rollout_timer, max_depth)
         if debug:
             print("Left normally")
             MCTS._print_node(tree, world, c)

@@ -28,7 +28,7 @@ class Connect4Board:
 class Connect4(MCTSInterface):
     @staticmethod
     def play(state: Connect4Board, action: int) -> Connect4Board: 
-        assert not Connect4.is_out_of_bounds(state, 0, action), f"Invalid Action: {action}"
+        # assert not Connect4.is_out_of_bounds(state, 0, action), f"Invalid Action: {action}"
 
         col: int = action
         row: int = Connect4.action_get_row(state, col)
@@ -121,7 +121,6 @@ class Connect4(MCTSInterface):
 
     @staticmethod
     def reverse_player(player: int) -> int:
-        assert player == 1 or player == 2
         return player % 2 + 1
 
     @staticmethod
@@ -130,7 +129,7 @@ class Connect4(MCTSInterface):
         cp.board1  = state.board1
         cp.board2  = state.board2
         cp.player  = state.player
-        cp.heights = [height for height in state.heights]
+        cp.heights = state.heights[:]
         return cp
 
     @staticmethod
@@ -188,13 +187,13 @@ class Connect4(MCTSInterface):
         return 0 if (state.board1 | state.board2) & first_row != first_row else 1
 
     @staticmethod
-    def count_in_direction(state: Connect4Board, start_row: int, start_col: int, drow: int, dcol: int, player: int) -> int:
+    def count_in_direction(state: Connect4Board, row: int, col: int, drow: int, dcol: int, player: int) -> int:
         count: int = 0
-        row, col = start_row, start_col
+        rows: int = state.rows
+        cols: int = state.cols
 
         board: Connect4Board = state.board1 if player == 1 else state.board2
-
-        while 0 <= row < state.rows and 0 <= col < state.cols and (board >> (state.cols * row + col)) & 1 == 1:
+        while 0 <= row < rows and 0 <= col < cols and (board >> (cols * row + col)) & 1 == 1:
             count += 1
             row += drow
             col += dcol
