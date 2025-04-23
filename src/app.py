@@ -247,7 +247,7 @@ async def pick_action(app: App, state: Connect4Board) -> int:
             elif state.player == 2 and app.opponent == 1:
                 mcts_choice = asyncio.create_task(
                     MCTS.mcts(
-                        state = state, 
+                        root_state = state, 
                         world = Connect4, 
                         s_rollout = int(1e5), 
                         max_expansion = 7, 
@@ -259,12 +259,11 @@ async def pick_action(app: App, state: Connect4Board) -> int:
         case 3:
             mcts_choice = asyncio.create_task(
                 MCTS.mcts(
-                    state = state, 
+                    root_state = state, 
                     world = Connect4, 
                     s_rollout = int(1e5), 
                     max_expansion = 7, 
-                    debug = True,
-                    timer = False
+                    debug = True
                 )
             )
             action = await mcts_choice
