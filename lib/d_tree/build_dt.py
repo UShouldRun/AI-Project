@@ -1,5 +1,4 @@
 import numpy as np
-
 from classes.node import Node
 
 def entropy(data):
@@ -18,6 +17,7 @@ def split_data(X,y,feature,value):
 def build_tree(X,y):
     if len(set(y)) == 1:
         return Node(results=y[0])
+
 
     best_gain = 0 
     best_criteria = None

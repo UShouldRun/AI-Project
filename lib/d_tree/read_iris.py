@@ -49,11 +49,11 @@ def train_tree(iris_data):
     print(f"Accuracy: {accuracy:.2%}")
 
 
+def main():
+    iris_dataset=read_csv()
+    train_tree(iris_dataset)
 
 if __name__ == "__main__":
-
-    iris_dataset=read_csv()
-
-    train_tree(iris_dataset)
+    main()
 
     
