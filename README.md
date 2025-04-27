@@ -1,109 +1,143 @@
 # Connect Four with MCTS and Decision Tree AI
 
-An implementation of the Connect Four game with multiple AI strategies using Monte Carlo Tree Search (MCTS) and Decision Trees.
+An implementation of Connect Four featuring AI players powered by **Monte Carlo Tree Search (MCTS)** and **Decision Trees**.
+
+---
 
 ## Overview
 
-This project implements the classic Connect Four game with three gameplay modes:
-- Human vs Human
-- Human vs AI
-- AI vs AI (comparing different algorithms)
+This project offers three gameplay modes:
+- **Human vs Human**
+- **Human vs AI**
+- **AI vs AI**
 
-Two AI approaches are implemented:
-1. **Monte Carlo Tree Search (MCTS)** - A probabilistic search algorithm that builds a search tree through random sampling
-2. **Decision Tree** - A machine learning model trained on MCTS gameplay data
+It includes two AI strategies:
+- **Monte Carlo Tree Search (MCTS):** A simulation-based search algorithm.
+- **Decision Tree AI:** A machine learning model trained on MCTS-generated gameplay data.
+
+For detailed documentation, refer to the files in the [`docs/`](./docs) directory.
+
+---
 
 ## Features
 
-- Interactive command-line interface for playing Connect Four
-- Efficient bit-board representation of the game state
-- Customizable MCTS parameters (exploration constant, rollout depth, etc.)
-- Decision Tree model trained on MCTS gameplay data
-- Performance metrics and visualizations for AI comparison
+- Interactive command-line interface.
+- Efficient bitboard-based game state representation.
+- Configurable MCTS parameters.
+- Decision Tree AI trained on self-play data.
+- AI comparison mode for testing strategies.
+
+---
 
 ## Requirements
 
 - Python 3.10+
-- NumPy
-- Asyncio
+- [NumPy](https://numpy.org/)
+- [Asyncio](https://docs.python.org/3/library/asyncio.html) (comes built-in with Python 3.3+)
+
+---
 
 ## Installation
 
-Clone the repository and install the dependencies:
+1. **Clone the repository:**
+    ```bash
+    git clone https://github.com/UShouldRun/AI-Project.git
+    cd AI-Project
+    ```
 
-```bash
-git clone https://github.com/your-username/connect-four-ai.git
-cd connect-four-ai
-pip install -r requirements.txt
-```
+2. **Install dependencies:**
+
+    ```bash
+    pip install numpy
+    ```
+
+3. **Ensure Python 3 is installed:**
+
+    - **Linux (Debian/Ubuntu):**
+        ```bash
+        sudo apt update
+        sudo apt install python3 python3-pip
+        ```
+    - **macOS:** (using Homebrew)
+        ```bash
+        brew install python3
+        ```
+    - **Windows:**  
+        Download from [python.org](https://www.python.org/) and follow installation instructions.  
+        ➔ **Important:** Check "Add Python to PATH" during installation.
+
+---
 
 ## Usage
 
 ### Running the Game
-
 ```bash
 python main.py
 ```
-This will launch the game interface where you can select the game mode and AI settings.
 
-## Algorithms
+This launches the interactive game interface.
 
-### Monte Carlo Tree Search (MCTS)
+---
 
-Our MCTS implementation uses the UCT (Upper Confidence Bound for Trees) formula for node selection. The algorithm follows four main steps:
-1. Selection - Navigate the tree from root to leaf
-2. Expansion - Generate child nodes for unexplored actions
-3. Simulation - Perform random rollouts to estimate value
-4. Backpropagation - Update statistics back up the tree
+### Generating Training Data for the Decision Tree
+```bash
+python create_ds.py <filename.csv> <mcts_rollouts> <num_games>
+```
 
-Configuration parameters:
-- `c`: Exploration parameter (default: √2)
-- `s_rollout`: Number of rollouts to perform
-- `heuristic`: Whether to use a heuristic evaluation function
+**Example:**
+```bash
+python create_ds.py dt_data.csv 1000 5000
+```
 
-### Decision Tree
+See [`docs/create_ds.md`](./docs/create_ds.md) for more information.
 
-The Decision Tree AI is implemented using the ID3 algorithm and trained on data generated from MCTS gameplay. The implementation:
-1. Uses MCTS to generate a dataset of (state, best_move) pairs
-2. Processes the dataset to extract meaningful features
-3. Builds a decision tree using the ID3 algorithm
-4. Uses the tree to make move decisions during gameplay
+---
 
-## Training the Decision Tree
+### Training the Decision Tree Model
+```bash
+python lib/d_tree/build_dt.py --games <num_games> --mcts-rollouts <rollouts_per_move>
+```
 
-To generate training data and build the decision tree:
-
+**Example:**
 ```bash
 python lib/d_tree/build_dt.py --games 1000 --mcts-rollouts 500
 ```
 
-This will:
-1. Play 1000 self-play games using MCTS (with 500 rollouts per move)
-2. Generate a dataset of board states and optimal moves
-3. Train a decision tree on this dataset
-4. Save the model for later use
+More details in [`docs/d_tree.md`](./docs/d_tree.md) (if available).
 
-## Testing
+---
 
-The decision tree implementation was initially tested on the Iris dataset before being applied to the Connect Four domain.
-
+### Playing with Optimizations (AI Mode)
 ```bash
-# Run tests on the Iris dataset
-python lib/d_tree/read_iris.py
+python3 -O main.py
 ```
 
-## Performance
+---
 
-The MCTS algorithm's performance scales with the number of rollouts. The decision tree offers faster move computation at the cost of some strategic depth.
+## Algorithms
+
+### Monte Carlo Tree Search (MCTS)
+- Implemented with UCT (Upper Confidence Bound applied to Trees) for node selection.
+- See [`docs/mcts.md`](./docs/mcts.md) for technical details.
+
+### Decision Tree
+- Trained on MCTS gameplay data.
+- Uses the ID3 algorithm.
+
+---
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the **MIT License**. See the [LICENSE](./LICENSE) file for details.
+
+---
 
 ## Acknowledgments
 
-- This project was developed as part of the Artificial Intelligence 2024/2025 course assignment
-- Based on concepts from "Adversarial search strategies and Decision Trees"
+- Developed as part of the **Artificial Intelligence 2024/2025** course assignment.
+- Inspired by concepts from *"Adversarial search strategies and Decision Trees"*.
+
+---
 
 ## Authors
 

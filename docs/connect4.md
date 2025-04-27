@@ -1,189 +1,78 @@
 # Connect4 Implementation Documentation
 
-## Overview
-
-This implementation of Connect4 serves as a concrete example of applying the MCTS (Monte Carlo Tree Search) algorithm to a classic board game. Connect4 is implemented as a 2-player game where players alternate placing pieces into a vertical grid, aiming to connect four pieces horizontally, vertically, or diagonally.
+Implements Connect4 as an example for MCTS. Two players aim to connect four pieces.
 
 ## Components
 
-### Connect4Board
+### `Connect4Board`
 
-The `Connect4Board` class represents the game state using bit boards for efficient representation and operations.
+Represents the Connect4 game board using bitboards.
 
-#### Properties
+#### Attributes
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `player` | int | Current player (1 or 2) |
-| `rows` | int | Number of rows in the board |
-| `cols` | int | Number of columns in the board |
-| `board1` | int | Bit board for player 1's pieces |
-| `board2` | int | Bit board for player 2's pieces |
-| `heights` | List[int] | Current height of each column |
+-   `player: int`: Current player (1 or 2).
+-   `rows: int`: Number of rows.
+-   `cols: int`: Number of columns.
+-   `board1: int`: Bitboard for player 1.
+-   `board2: int`: Bitboard for player 2.
+-   `heights: List[int]`: Current height of each column.
 
 #### Methods
 
-| Method | Description |
-|--------|-------------|
-| `place_piece(player, row, col)` | Places a piece for the given player at the specified position |
-| `get_piece(row, col)` | Returns the player (1 or 2) whose piece is at the given position, or 0 if empty |
+-   `__init__(rows, cols)`: Initializes the board.
+-   `place_piece(player, row, col) -> None`: Places a piece.
+-   `get_piece(row, col) -> int`: Gets the piece at a position (0 if empty).
 
-### Connect4 (MCTSInterface Implementation)
+### `Connect4` (`MCTSInterface` Implementation)
 
-`Connect4` implements the `MCTSInterface` to provide the game-specific logic for the MCTS algorithm.
+Implements `MCTSInterface` for Connect4 game logic.
 
-#### Methods
+#### Static Methods
 
-##### State Transitions
+-   `play(state: Connect4Board, action: int) -> Connect4Board`: Executes a move.
+-   `get_actions(state: Connect4Board) -> List[int]`: Returns valid column actions.
+-   `is_terminal_state(state: Connect4Board, action: int) -> bool`: Checks if game ended.
+-   `value(state: Connect4Board, action: int, player: Optional[int] = None) -> float`: Returns game value (-1: ongoing, 0.5: draw, 0/1: loss/win).
+-   `heuristic(state: Connect4Board, player: int) -> float`: Evaluates board position \[0,1].
+-   `evaluate_line(line: List[int], player: int) -> int`: Evaluates a line of 4.
+-   `get_current_player(state: Connect4Board) -> int`: Returns current player.
+-   `reverse_player(player: int) -> int`: Returns opponent.
+-   `copy(state: Connect4Board) -> Connect4Board`: Creates a board copy.
+-   `print(state: Connect4Board) -> None`: Prints the board.
+-   `init_board(rows: int, cols: int) -> Connect4Board`: Creates a new board.
+-   `action_get_row(state: Connect4Board, col: int) -> int`: Gets the row for an action.
+-   `is_out_of_bounds(state: Connect4Board, row: int, col: int) -> bool`: Checks board boundaries.
+-   `check_result(state: Connect4Board, action: int) -> int`: Checks for win/draw/ongoing (0/1/2).
+-   `count_in_direction(state: Connect4Board, row: int, col: int, drow: int, dcol: int, player: int) -> int`: Counts consecutive pieces.
 
-```python
-@staticmethod
-def play(state: Connect4Board, action: int) -> Connect4Board
-```
-Executes a move (placing a piece in a column) and returns the updated board state.
+## Performance
 
-##### Action Generation
-
-```python
-@staticmethod
-def get_actions(state: Connect4Board) -> List[int]
-```
-Returns a list of valid columns where a piece can be placed (not full).
-
-##### Terminal State Detection
-
-```python
-@staticmethod
-def is_terminal_state(state: Connect4Board, action: int) -> bool
-```
-Checks if the game has ended after the given action.
-
-##### Value Evaluation
-
-```python
-@staticmethod
-def value(state: Connect4Board, action: int, player: Optional[int] = None) -> float
-```
-Returns:
-- `-1` if game is not over
-- `0.5` for a draw
-- `0` or `1` for a loss or win (relative to the current player or specified player)
-
-##### Heuristic Evaluation
-
-```python
-@staticmethod
-def heuristic(state: Connect4Board, player: int) -> float
-```
-Evaluates the board position using pattern recognition:
-- Counts sequences of pieces (1, 2, 3, or 4 in a row)
-- Assigns different weights based on sequence length and whether opposing pieces block
-- Normalizes the result to [0,1]
-
-##### Pattern Evaluation
-
-```python
-@staticmethod
-def evaluate_line(line: List[int], player: int) -> int
-```
-Evaluates a line of 4 consecutive positions:
-- +100 for 4-in-a-row (win)
-- +10 for 3-in-a-row with an empty space
-- +1 for 2-in-a-row with two empty spaces
-- Negative values for opponent's sequences
-
-##### Player Management
-
-```python
-@staticmethod
-def get_current_player(state: Connect4Board) -> int
-```
-Returns the current player (1 or 2).
-
-```python
-@staticmethod
-def reverse_player(player: int) -> int
-```
-Returns the opponent of the given player.
-
-##### State Manipulation
-
-```python
-@staticmethod
-def copy(state: Connect4Board) -> Connect4Board
-```
-Creates a deep copy of the board state.
-
-```python
-@staticmethod
-def print(state: Connect4Board) -> None
-```
-Displays the board in a human-readable format.
-
-##### Helper Methods
-
-```python
-@staticmethod
-def init_board(rows: int, cols: int) -> Connect4Board
-```
-Creates a new Connect4 board with the specified dimensions.
-
-```python
-@staticmethod
-def action_get_row(state: Connect4Board, col: int) -> int
-```
-Determines which row a piece will land in when dropped in a given column.
-
-```python
-@staticmethod
-def is_out_of_bounds(state: Connect4Board, row: int, col: int) -> bool
-```
-Checks if a position is outside the board boundaries.
-
-```python
-@staticmethod
-def check_result(state: Connect4Board, action: int) -> int
-```
-Checks if the last action resulted in a win, draw, or ongoing game.
-
-```python
-@staticmethod
-def count_in_direction(state: Connect4Board, start_row: int, start_col: int, drow: int, dcol: int, player: int) -> int
-```
-Counts consecutive pieces of a player in a specific direction from a starting position.
-
-## Performance Considerations
-
-The implementation uses bit boards (`board1` and `board2`) to represent the game state efficiently. This approach:
-
-1. Reduces memory usage
-2. Speeds up move generation and validation
-3. Makes copying game states faster
-4. Enables efficient pattern detection
+Uses bitboards for efficient state representation and operations.
 
 ## Usage with MCTS
 
-To use this Connect4 implementation with the MCTS algorithm:
+Example of using `Connect4` with `MCTS`:
 
 ```python
 from lib.mcts import MCTS
 from lib.connect4 import Connect4, Connect4Board
+import asyncio
 
-# Create initial board
-board = Connect4.init_board(6, 7)  # Standard Connect4 dimensions
+async def main():
+    board = Connect4.init_board(6, 7)
+    best_move = await MCTS.mcts(
+        root_state=board,
+        world=Connect4,
+        s_rollout=1000,
+        s_initial_rollout=100,
+        c=1.414,
+        max_expansion=7,
+        debug=False,
+        timer=True
+    )
+    print(f"Best move: Column {best_move}")
+    new_board = Connect4.play(board, best_move)
+    Connect4.print(new_board)
 
-# Run MCTS to find the best move
-best_move = await MCTS.mcts(
-    state=board,
-    world=Connect4,
-    s_rollout=1000,        # Number of simulations
-    s_initial_rollout=100, # Initial random rollouts
-    c=1.41,                # Exploration parameter
-    heuristic=(True, 20)   # Use heuristic evaluation with max depth 20
-)
-
-# Make the move
-new_board = Connect4.play(board, best_move)
-```
-
-The MCTS algorithm will build a search tree to find the most promising move, using the Connect4 implementation to simulate game play and evaluate positions.
+if __name__ == "__main__":
+    asyncio.run(main())

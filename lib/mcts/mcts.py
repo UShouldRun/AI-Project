@@ -4,7 +4,6 @@ from math import sqrt, log
 from typing import TypeVar, List, Optional
 from timeit import default_timer
 
-
 import numpy as np
 
 State  = TypeVar("State")
@@ -173,6 +172,8 @@ class MCTS:
         assert node is not None
 
         for child in node.get_children():
+            if child.terminal != -1:
+                continue
             MCTS._expand(
                 child,
                 world.play(world.copy(state), child.action),
@@ -201,30 +202,36 @@ class MCTS:
         assert n > 0, f"Invalid number of random rollouts: n = {n}"
 
         for _ in range(n):
-            node: MCTSNode = root 
+            node: MCTSNode = root
             state: State   = world.copy(root_state)
 
             while not node.is_leaf():
-                temp: Optional[MCTSNode] = None
-                while temp is None or temp.terminal != -1:
-                    temp = node.children[randint(0, node.s_children - 1)]
+                possible_children: List[MCTSNode] = [
+                    child
+                    for child in node.children[:node.s_children]
+                    if child.terminal == -1
+                ]
+                if not possible_children:
+                    return
 
-                node = temp
+                node = possible_children[randint(0, len(possible_children) - 1)]
                 state = world.play(state, node.action)
 
             if not MCTS._expand(node, state, world):
                 continue
 
             for child in node.get_children():
+                if child.terminal != -1:
+                    continue
                 MCTS._rollout(
-                    child, 
-                    world.play(world.copy(state), child.action), 
+                    child,
+                    world.play(world.copy(state), child.action),
                     world
                 )
 
-            MCTS._sort_children(root)
-            if root.children[0].terminal == -1:
-                return
+        MCTS._sort_children(root)
+        if root.children[0].terminal != -1:
+            return
 
     @staticmethod
     def _evaluate(node: MCTSNode, c: float) -> float:
@@ -294,7 +301,7 @@ class MCTS:
     def _rollout(leaf: MCTSNode, state: State, world: MCTSInterface) -> None:
         """Simulates a random rollout from the given leaf node."""
         assert leaf != None and leaf.is_leaf(), f"leaf: {leaf}"
-        assert not MCTS._is_terminal_node(leaf)
+        assert not MCTS._is_terminal_node(leaf), world.print(state)
 
         action: Action = None
         value:  float  = -1
@@ -398,14 +405,20 @@ class MCTS:
                 break
 
             node, state = MCTS._select(root, root_state, world, c)
-            if node == None or node.terminal == 1:
+            if node == None or node.terminal != -1:
                 break
 
             if node.visits > 0:
                 if not MCTS._expand(node, state, world):
                     continue
+
                 node  = node.children[randint(0, node.s_children - 1)]
                 state = world.play(state, node.action)
+
+                node.terminal = world.value(state, node.action)
+                if node.terminal != -1:
+                    MCTS._backpropagate_terminal(node.parent, 1 - node.terminal)
+                    continue
 
             MCTS._rollout(node, state, world)
 

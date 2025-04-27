@@ -1,5 +1,5 @@
 from lib.connect4 import Connect4, Connect4Board
-from lib.mcts import MCTS
+from lib.mcts import MCTS, MCTSNode
 from src.window import Window
 
 import pygame
@@ -8,7 +8,7 @@ import time
 
 class App:
     def __init__(self) -> None:
-        self.window:      Window          = Window(0.90)
+        self.window:      Window          = Window(0.70)
         self.running:     bool            = True
         self.game_start:  bool            = False
         self.gamemode:    int             = 0
@@ -17,15 +17,16 @@ class App:
 
         font = pygame.font.Font(None, int(self.window.scale * self.window.info.current_w) // 25)
 
-        esc: pygame.Rect = pygame.Rect(
-            int(0.895 * self.window.scale * self.window.info.current_w),
-            int(0.90 * self.window.scale * self.window.info.current_h),
-            # half the screen minus the button height minus half the center button height
-            int(self.window.scale * self.window.info.current_w) // 10,
-            int(self.window.scale * self.window.info.current_h) // 10
-        )
-        text_esc = font.render("Menu", True, (255, 255, 255))
-        self.esc_button = (esc, text_esc)
+        # width: int  = int(self.window.scale * self.window.info.current_w) // 20
+        # height: int = int(self.window.scale * self.window.info.current_h) // 20
+        # esc: pygame.Rect = pygame.Rect(
+            # int(self.window.scale * self.window.info.current_w) - width - 10,
+            # int(self.window.scale * self.window.info.current_h) - height - 10,
+            # width,
+            # height
+        # )
+        # text_esc = font.render("Menu", True, (255, 255, 255))
+        # self.esc_button = (esc, text_esc)
 
         button_pvp: pygame.Rect = pygame.Rect(
             int(self.window.scale * self.window.info.current_w) // 4,
@@ -88,14 +89,24 @@ class App:
         self.player2_win = font.render("Player 2 Wins", True, (218, 62, 82))
         self.draw = font.render("Draw", True, (218, 62, 82))
 
+        width: int = int(0.33 * self.window.scale * self.window.info.current_w)
+        height: int = int(self.window.scale * self.window.info.current_h)
+        eval_base_rect: pygame.Rect = pygame.Rect(
+            int(self.window.scale * self.window.info.current_w) - width,
+            0,
+            width,
+            height
+        )
+        self.eval = [True, eval_base_rect]
+
 def draw_base(window: Window) -> None:
-    color: tuple[int, int, int] = (147, 175, 174)
+    color: tuple[int, int, int] = (0, 31, 63)
     window.window.fill(color)
 
 def draw_menu(app: App) -> int:
     draw_base(app.window)
     for i, (rect, text) in enumerate(app.menu_objects):
-        pygame.draw.rect(app.window.window, (47, 69, 80), rect)
+        pygame.draw.rect(app.window.window, (19, 75, 112), rect, border_radius = 10)
         app.window.window.blit(
             text,
             text.get_rect(
@@ -109,7 +120,7 @@ def draw_menu(app: App) -> int:
 def pick_opponnent(app: App) -> int:
     draw_base(app.window)
     for i, rect in enumerate(app.pick_opponnent_objects[0]):
-        pygame.draw.rect(app.window.window, (47, 69, 80), rect)
+        pygame.draw.rect(app.window.window, (19, 75, 112), rect, border_radius = 10)
         text = app.pick_opponnent_objects[1][i + (2 if app.gamemode == 3 else 0)]
         app.window.window.blit(
             text,
@@ -126,8 +137,8 @@ def draw_result(app: App, result: int) -> None:
         label,
         label.get_rect(
             center = (
-                (app.window.info.current_w - label.get_rect().width) // 2,
-                (app.window.info.current_h - label.get_rect().height) // 2
+                int(.5 * app.window.scale * (app.window.info.current_w - label.get_rect().width)),
+                int(.5 * app.window.scale * (app.window.info.current_h - label.get_rect().height))
             )
         )
     )
@@ -135,16 +146,16 @@ def draw_result(app: App, result: int) -> None:
 def draw_game(app: App, state: Connect4Board) -> None:
     draw_base(app.window)
 
-    pygame.draw.rect(app.window.window, (47, 69, 80), app.esc_button[0])
-    app.window.window.blit(
-        app.esc_button[1],
-        app.esc_button[1].get_rect(
-            center = (
-                (app.esc_button[0].x + app.esc_button[0].width - app.esc_button[1].get_rect().width) // 2,
-                (app.esc_button[0].y + app.esc_button[0].height - app.esc_button[1].get_rect().height) // 2
-            )
-        )
-    )
+    # pygame.draw.rect(app.window.window, (47, 69, 80), app.esc_button[0], border_radius = 10)
+    # app.window.window.blit(
+        # app.esc_button[1],
+        # app.esc_button[1].get_rect(
+            # center = (
+                # (app.esc_button[0].x + app.esc_button[0].width - app.esc_button[1].get_rect().width) // 2,
+                # (app.esc_button[0].y + app.esc_button[0].height - app.esc_button[1].get_rect().height) // 2
+            # )
+        # )
+    # )
 
     rows, cols = state.rows, state.cols
     s_row, s_col = (
@@ -153,26 +164,14 @@ def draw_game(app: App, state: Connect4Board) -> None:
     )
 
     base_rect: pygame.Rect = pygame.Rect(
-        int(app.window.scale * app.window.info.current_w - cols * s_col) // 2,
+        0, # int(app.window.scale * app.window.info.current_w - cols * s_col) // 2,
         s_row,
-        cols * s_col,
-        rows * s_row
+        cols * s_col + 10,
+        app.window.info.current_h - s_row
     )
-    pygame.draw.rect(app.window.window, (47, 69, 80), base_rect)
-
-    app.esc_button[0].y = base_rect.y + base_rect.height - app.esc_button[0].height
-    pygame.draw.rect(app.window.window, (47, 69, 80), app.esc_button[0])
-    app.window.window.blit(
-        app.esc_button[1],
-        app.esc_button[1].get_rect(
-            center = (
-                app.esc_button[0].x + app.esc_button[0].width // 2,
-                app.esc_button[0].y + app.esc_button[0].height // 2
-            )
-        )
-    )
-
-    color: tuple[int, int, int] = (184, 219, 217)
+    pygame.draw.rect(app.window.window, (19, 75, 112), base_rect, border_radius = 10)
+    
+    color: tuple[int, int, int] = (0, 31, 63)
     radius: int = int(0.90 * min(s_row, s_col)) // 2
 
     for i in range(rows):
@@ -182,13 +181,13 @@ def draw_game(app: App, state: Connect4Board) -> None:
             elif state.get_piece(i, j) == 2:
                 color = (218, 62, 82)
             else:
-                color = (147, 175, 174)
+                color = (0, 31, 63)
 
             center: tuple[int, int] = (
                 base_rect.x + j * (s_col + 1) + s_col // 2, base_rect.y + i * s_row + s_row // 2
             )
             pygame.draw.circle(app.window.window, color, center, radius)
-            if color != (147, 175, 174):
+            if color != (0, 31, 63):
                 pygame.draw.circle(
                     app.window.window, 
                     (color[0] * 0.90, color[1] * 0.90, color[2] * 0.90), 
@@ -216,12 +215,18 @@ def draw_game(app: App, state: Connect4Board) -> None:
         radius * 0.85
     )
 
+    draw_mcts_eval(app, None)
+
+def draw_mcts_eval(app: App, root: MCTSNode) -> None:
+    if not app.eval[0]:
+        return
+
+    
+
 def player_action(app: App, state: Connect4Board) -> int:
     cols: int  = state.cols
     s_col: int = int(app.window.scale * app.window.info.current_h) // cols
-    x: int     = int(
-        int(app.window.scale * app.window.info.current_w - cols * s_col) // 2
-    )
+    x: int     = 0
 
     if not 0 <= app.mouse_click[0] - x <= s_col * cols:
         return None
@@ -291,8 +296,10 @@ async def main() -> None:
             if event.type == pygame.QUIT:
                 app.running = False
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_F11:
-                    app.window.resize(1.00 if app.window.scale < 1.00 else 0.75)
+                # if event.key == pygame.K_F11:
+                    # app.window.resize(1.00 if app.window.scale < 1.00 else 0.75)
+                if event.key == pygame.K_ESCAPE:
+                    app.gamemode = 0
             if event.type == pygame.MOUSEBUTTONDOWN:
                 app.mouse_click = event.pos
 
@@ -302,10 +309,10 @@ async def main() -> None:
                 state: Connect4Board = Connect4.init_board(6, 7)
                 app.in_game = True
 
-            app.in_game = app.in_game and not (
-                    app.mouse_click != None 
-                and app.esc_button[0].collidepoint(app.mouse_click[0], app.mouse_click[1])
-            )
+            # app.in_game = app.in_game and not (
+                    # app.mouse_click != None 
+                # and app.esc_button[0].collidepoint(app.mouse_click[0], app.mouse_click[1])
+            # )
 
             if app.in_game:
                 draw_game(app, state)

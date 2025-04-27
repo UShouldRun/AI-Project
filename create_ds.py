@@ -1,11 +1,24 @@
-import numpy as np
-from lib.mcts import MCTS
+from lib.mcts import MCTS, Optional
 from lib.connect4 import Connect4
 from csv import writer
+
+import numpy as np
 import asyncio
+import sys
 
+def progress_print(iteration: int, total_items: int) -> None:
+    bar_length: int = 50
 
-async def generate_ds(s_rollout: int, dt_size: int):
+    progress = (iteration + 1) / total_items
+    percent = int(progress * 100)
+
+    filled_length = int(progress * bar_length)
+    bar = '=' * filled_length + ' ' * (bar_length - filled_length)
+
+    sys.stdout.write(f"\r[{bar}] {percent}% ({iteration + 1}/{total_items})")
+    sys.stdout.flush()
+
+async def generate_ds(s_rollout: int, dt_size: int) -> np.array:
     """
     Generate a dataset of self-play Connect4 games using MCTS.
 
@@ -17,39 +30,45 @@ async def generate_ds(s_rollout: int, dt_size: int):
         }
       where result is 0 (lose), 1 (draw), or 2 (win) for that player.
     """
-    games = np.empty(dt_size, dtype=object)
+    games: np.array = np.empty(dt_size, dtype = object)
 
     for i in range(dt_size):
-        board = Connect4.init_board(6, 7)
-        game_records = {1: [], 2: []}
-        action = None
-        current_player = 1
+        progress_print(i, dt_size)
 
-        # Play until terminal state
-        while not Connect4.is_terminal_state(board, action):
-            action = await MCTS.mcts(board, Connect4, s_rollout, max_expansion=7)
-            game_records[current_player].append((Connect4.copy(board), action))
-            board = Connect4.play(board, action)
-            current_player = Connect4.reverse_player(current_player)
+        game_records: dict = {1: [], 2: []}
 
-        # Determine game outcome: 0=draw, 1 or 2 for the winner
-        winner = Connect4.value(board)
+        board: Connect4 = Connect4.init_board(6, 7)
+        action: Optional[int] = None
+        curr_player: int = 1
+        value: int = -1
 
-        # Build the per-player entries
+        while value == -1:
+            action = await MCTS.mcts(board, Connect4, s_rollout, max_expansion = 7, debug = False)
+            game_records[curr_player].append((Connect4.copy(board), action))
+
+            board       = Connect4.play(board, action)
+            value       = Connect4.value(board, action)
+            curr_player = Connect4.reverse_player(curr_player)
+
+        # print(f"  result: { 'win' if value == 1 and board.player != curr_player else ('draw' if value == .5 else 'loss') }")
+        # print(f"  state:")
+        # Connect4.print(board)
+
         result_dict = {}
         for player in (1, 2):
-            if winner == 1/2:
-                result = 1  # draw
-            elif winner == 1 and player == current_player:
-                result = 0  # win
+            if value == 1/2:
+                result = 1
+            elif value == 1 and player == curr_player:
+                result = 0
             else:
-                result = 2  # lose
+                result = 2
 
-            # convert move list to numpy array of object tuples
-            moves_arr = np.array(game_records[player], dtype=object)
+            moves_arr = np.array(game_records[player], dtype = object)
             result_dict[player] = (moves_arr, result)
 
         games[i] = result_dict
+
+    print(f"\nSuccessfully generated all {dt_size} games")
 
     return games
 
@@ -66,18 +85,27 @@ def create_csv(games: np.array, filename: str):
       - result: 0 (lose), 1 (draw), or 2 (win)
     """
 
-    with open(filename, mode="w", newline="") as csvfile:
-        writer = writer(csvfile)
-        writer.writerow(["game_id", "player", "board1", "board2", "action", "result"])
-        # Iterate over games and write each move
+    with open(filename, mode = "w", newline = "") as csvfile:
+        csv_writer = writer(csvfile)
+        csv_writer.writerow(["game_id", "player", "board1", "board2", "action", "result"])
+
         for game_id, game in enumerate(games):
             for player, (moves, result) in game.items():
                 for board, action in moves:
-                    writer.writerow([game_id, player, board.board1, board.board2, action, result])
+                    csv_writer.writerow(
+                        [game_id, player, board.board1, board.board2, action, result]
+                    )
 
 async def main():
-    games = await generate_ds(s_rollout=1000, dt_size=10)
-    create_csv(games, filename="dt.csv")
+    if len(sys.argv) != 4:
+        print("Usage: python create_ds.py <filename.csv: str> <s_rollout: int> <dt_size: int>")
+        sys.exit(1)
+    filename: str = sys.argv[1]
+    s_rollout: int = int(sys.argv[2])
+    dt_size: int = int(sys.argv[3])
+
+    games = await generate_ds(s_rollout = s_rollout, dt_size = dt_size)
+    create_csv(games, filename = filename)
 
 if __name__ == "__main__":
     asyncio.run(main())
