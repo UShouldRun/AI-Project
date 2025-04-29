@@ -1,7 +1,12 @@
 import numpy as np
+
 from classes.node import Node
 
 def entropy(data):
+
+    if len(data) == 0:
+        return 0
+
     counts = np.bincount(data)
     probabilities = counts / len(data)
     entropy = -np.sum([p * np.log2(p) for p in probabilities if p > 0])
@@ -14,39 +19,60 @@ def split_data(X,y,feature,value):
     false_X, false_y = X[false_indices], y[false_indices]
     return true_X, true_y, false_X, false_y
 
-def build_tree(X,y):
+def information_gain(y, true_y, false_y):
+    p = len(true_y) / len(y)
+    return entropy(y) - p * entropy(true_y) - (1-p) * entropy(false_y)
+
+def most_common_label(y):
+    """Return the most common label in a dataset."""
+    unique_labels, counts = np.unique(y, return_counts=True)
+    return unique_labels[np.argmax(counts)]
+
+def build_tree(X,y, max_depth=None, min_samples=2, depth=0):
+
     if len(set(y)) == 1:
         return Node(results=y[0])
 
+    if len(y) < min_samples:  # Too few samples
+        return Node(results=most_common_label(y))
+
+    if max_depth is not None and depth >= max_depth:  # Max depth reached
+        return Node(results=most_common_label(y))
+
+    #find the best split 
 
     best_gain = 0 
     best_criteria = None
     best_sets = None
     n_features = X.shape[1]
 
-    current_entropy=entropy(y)
-    
     for feature in range(n_features):
-        feature_values=set(X[:, feature])
-        
-        for value in feature_values:
+        feature_values = np.sort(np.unique(X[:, feature])) 
+
+        for i in range(len(feature_values) - 1):
+            value = (feature_values[i] + feature_values[i + 1]) / 2
+
             true_X, true_y, false_X, false_y = split_data(X, y, feature, value)
-            true_entropy = entropy(true_y)
-            false_entropy = entropy(false_y)
-            p=len(true_y)/len(y)
-            gain= current_entropy -p * true_entropy - (1-p) * false_entropy
-            
+
+            if len(true_y) == 0 or len(false_y) == 0:
+                continue
+
+            gain = information_gain(y, true_y, false_y)
+
             if gain>best_gain:
                 best_gain=gain 
                 best_criteria=(feature,value)
                 best_sets= (true_X, true_y, false_X, false_y)
 
-        if best_gain>0:
-            true_branch = build_tree(best_sets[0], best_sets[1])
-            false_branch = build_tree(best_sets[2], best_sets[3])
-            node= Node(feature=best_criteria[0], value=best_criteria[1], true_branch=true_branch, false_branch=false_branch)
-            return node
-        return Node(results=y[0])
+    if best_gain <= 0:
+        return Node(results=most_common_label(y))
+    
+    # Create child nodes
+    true_branch = build_tree(best_sets[0], best_sets[1], max_depth, min_samples, depth + 1)
+    false_branch = build_tree(best_sets[2], best_sets[3], max_depth, min_samples, depth + 1)
+    
+    return Node(feature=best_criteria[0], value=best_criteria[1], 
+                true_branch=true_branch, false_branch=false_branch)
 
 def predict(tree, sample):
     if tree.results is not None:
@@ -57,13 +83,18 @@ def predict(tree, sample):
             branch=tree.true_branch
         return predict(branch,sample)
 
-def print_tree(node, indent=""):
-    """ Recursively prints the decision tree. """
+def print_tree(node,feature_names=None, indent=""):
+
     if node.results is not None:
         print(indent + "Leaf:", node.results)
     else:
-        print(indent + f"Feature {node.feature} <= {node.value}?")
+        feature_name = f"Feature {node.feature}"
+        if feature_names is not None:
+            feature_name = feature_names[node.feature]
+            
+        print(indent + f"{feature_name} <= {node.value:.4f}?")
         print(indent + "  ├─ True:")
-        print_tree(node.true_branch, indent + "  │   ")
+        print_tree(node.true_branch, feature_names, indent + "  │   ")
         print(indent + "  └─ False:")
-        print_tree(node.false_branch, indent + "      ")
+        print_tree(node.false_branch, feature_names, indent + "      ")
+
