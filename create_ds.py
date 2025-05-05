@@ -43,7 +43,7 @@ async def generate_ds(s_rollout: int, dt_size: int) -> np.array:
         value: int = -1
 
         while value == -1:
-            action = await MCTS.mcts(board, Connect4, s_rollout, max_expansion = 7, debug = False)
+            action, _ = await MCTS.mcts(board, Connect4, s_rollout, max_expansion = 7, debug = False)
             game_records[curr_player].append((Connect4.copy(board), action))
 
             board       = Connect4.play(board, action)
@@ -72,7 +72,6 @@ async def generate_ds(s_rollout: int, dt_size: int) -> np.array:
 
     return games
 
-
 def create_csv(games: np.array, filename: str):
     """
     Template function to save generated games to a CSV file.
@@ -100,9 +99,9 @@ async def main():
     if len(sys.argv) != 4:
         print("Usage: python create_ds.py <filename.csv: str> <s_rollout: int> <dt_size: int>")
         sys.exit(1)
-    filename: str = sys.argv[1]
+    filename: str  = sys.argv[1]
     s_rollout: int = int(sys.argv[2])
-    dt_size: int = int(sys.argv[3])
+    dt_size: int   = int(sys.argv[3])
 
     games = await generate_ds(s_rollout = s_rollout, dt_size = dt_size)
     create_csv(games, filename = filename)

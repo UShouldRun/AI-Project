@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from math import sqrt, log
 from typing import TypeVar, List, Optional
 from timeit import default_timer
+from itertools import repeat
 
 import numpy as np
 
@@ -201,7 +202,7 @@ class MCTS:
         """Performs a random rollout starting from the given tree."""
         assert n > 0, f"Invalid number of random rollouts: n = {n}"
 
-        for _ in range(n):
+        for _ in repeat(None, n):
             node: MCTSNode = root
             state: State   = world.copy(root_state)
 
@@ -254,9 +255,9 @@ class MCTS:
                 best_child_idx += 1
                 if best_child_idx >= node.s_children:
                     return None, state
-
-            best_score: float = MCTS._evaluate(node.children[best_child_idx], c)
             
+            best_score: float = MCTS._evaluate(node.children[best_child_idx], c)
+
             for idx in range(best_child_idx + 1, node.s_children):
                 child: MCTSNode = node.children[idx]
                 if child.terminal != -1:
@@ -374,8 +375,8 @@ class MCTS:
     async def mcts(
         root_state: State, world: MCTSInterface, s_rollout: int, max_expansion: int = 10,
         s_initial_rollout: int = 100, c: float = round(sqrt(2), 3),
-        debug: bool = False, timer: bool = False
-    ) -> Action:
+        tree: bool = False, debug: bool = False, timer: bool = False
+    ) -> tuple[Action, Optional[MCTSNode]]:
         """Performs the Monte Carlo Tree Search and returns the best action."""
 
         if timer:
@@ -389,17 +390,17 @@ class MCTS:
             if debug:
                 print("Left winning_actions")
                 MCTS._print_node(root, root_state, world, c)
-            return root.children[0].action
+            return root.children[0].action, root
         
         if (only_action := MCTS._only_action(root, root_state, world, c)) != None:
             if debug:
                 print("Left only_action or just lost")
                 MCTS._print_node(root, root_state, world, c)
-            return only_action
+            return only_action, root
         
         MCTS._random_rollout(root, root_state, world, s_initial_rollout)
 
-        for _ in range(s_rollout):
+        for _ in repeat(None, s_rollout):
             MCTS._sort_children(root)
             if root.children[0].terminal == 1:
                 break
@@ -428,4 +429,4 @@ class MCTS:
             print("Left normally")
             MCTS._print_node(root, root_state, world, c)
 
-        return MCTS._pick_action(root)
+        return MCTS._pick_action(root), None if not tree else root

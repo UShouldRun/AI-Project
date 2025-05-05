@@ -1,5 +1,5 @@
 from lib.connect4 import Connect4, Connect4Board
-from lib.mcts import MCTS, MCTSNode
+from lib.mcts import MCTS, MCTSNode, Optional, List
 from src.window import Window
 
 import pygame
@@ -16,6 +16,7 @@ class App:
         self.mouse_click: tuple[int, int] = None
 
         font = pygame.font.Font(None, int(self.window.scale * self.window.info.current_w) // 25)
+        self.font = font
 
         # width: int  = int(self.window.scale * self.window.info.current_w) // 20
         # height: int = int(self.window.scale * self.window.info.current_h) // 20
@@ -143,7 +144,7 @@ def draw_result(app: App, result: int) -> None:
         )
     )
 
-def draw_game(app: App, state: Connect4Board) -> None:
+def draw_game(app: App, state: Connect4Board, root: MCTSNode, move_count: int, player: int) -> None:
     draw_base(app.window)
 
     # pygame.draw.rect(app.window.window, (47, 69, 80), app.esc_button[0], border_radius = 10)
@@ -215,13 +216,105 @@ def draw_game(app: App, state: Connect4Board) -> None:
         radius * 0.85
     )
 
-    draw_mcts_eval(app, None)
+    draw_mcts_eval(app, root, cols * s_col + 10, s_row, move_count, player)
 
-def draw_mcts_eval(app: App, root: MCTSNode) -> None:
-    if not app.eval[0]:
+def draw_mcts_eval(app: App, root: MCTSNode, x: int, y: int, move_count: int, player: int) -> None:
+    if app is None or root is None:
         return
 
-    
+    eval_child = lambda child: (
+        (
+            MCTS._convert_eval(child.reward / child.visits)
+            if child.visits > 0 else
+            float("inf")
+        )
+        if child.terminal == -1 
+        else MCTS._convert_terminal(child.terminal)
+    )
+
+    width: int = int(0.99 * app.window.scale * app.window.info.current_w - x)
+    height: int = int(app.window.scale * app.window.info.current_h) // 10
+
+    for i, child in enumerate(sorted(root.get_children(), key = eval_child, reverse = True)):
+        rect: pygame.Rect = pygame.Rect(
+            x + 5, y + i * (height + 3), width, height
+        )
+        eval_rect: pygame.Rect = pygame.Rect(
+            x + width // 25, y + i * (height + 3) + height // 20, width // 6, int(0.9 * height)
+        )
+
+        eval: float = eval_child(child)  * (1 if player == 1 else -1)
+        eval_text = app.font.render(
+            f"{eval:.2f}",
+            True,
+            (255, 255, 255)
+        )
+
+        best_path: str = ""
+        node: MCTSNode = child
+        best_path_text = app.font.render(
+            best_path,
+            True,
+            (255, 255, 255)
+        )
+
+        while True:
+            if node.s_children == 0:
+                break
+
+            best_path += f"{move_count + node.depth // 2}. "
+
+            if node.depth == 1 and player == 2:
+                best_path += ".. "
+            elif node.s_children > 0:
+                best_path += f"{node.action + 1} "
+                node = max(node.get_children(), key = eval_child)
+
+            if node.s_children > 0:
+                best_path += f"{node.action + 1} "
+                node = max(node.get_children(), key = eval_child)
+
+            best_path_text = app.font.render(
+                best_path,
+                True,
+                (255, 255, 255)
+            )
+
+            if eval_rect.x + eval_rect.width + best_path_text.get_rect().width >= rect.x + int(0.85 * rect.width) or node.s_children == 0:
+                break
+
+            node = max(node.get_children(), key = eval_child)
+
+        pygame.draw.rect(
+            app.window.window,
+            (19, 75, 112),
+            rect,
+            border_radius = 10
+        )
+        pygame.draw.rect(
+            app.window.window,
+            (242, 233, 78) if eval >= 0 else (218, 62, 82),
+            eval_rect, 
+            border_radius = 5
+        )
+        app.window.window.blit(
+            eval_text, 
+            eval_text.get_rect(
+                center = (
+                    eval_rect.x + eval_rect.width // 2, 
+                    eval_rect.y + eval_rect.height // 2
+                )
+            )
+        )
+        app.window.window.blit(
+            best_path_text, 
+            best_path_text.get_rect(
+                center = (
+                    eval_rect.x + eval_rect.width + 5 + best_path_text.get_rect().width // 2,
+                    rect.y + rect.height // 2
+                )
+            )
+        )
 
 def player_action(app: App, state: Connect4Board) -> int:
     cols: int  = state.cols
@@ -240,15 +333,38 @@ def player_action(app: App, state: Connect4Board) -> int:
 
     return None
 
-async def pick_action(app: App, state: Connect4Board) -> int:
+async def pick_action(app: App, state: Connect4Board) -> tuple[int, Optional[MCTSNode]]:
     action: int = None
+    root: Optional[MCTSNode] = None
     match app.gamemode:
         case 1:
             if app.mouse_click is not None:
                 action = player_action(app, state)
+                mcts_eval = asyncio.create_task(
+                    MCTS.mcts(
+                        root_state = state, 
+                        world = Connect4, 
+                        s_rollout = int(1e3), 
+                        max_expansion = 7, 
+                        tree  = True,
+                    )
+                )
+                _, root = await mcts_eval
+
         case 2:
             if state.player == 1 and app.mouse_click is not None:
                 action = player_action(app, state)
+                mcts_eval = asyncio.create_task(
+                    MCTS.mcts(
+                        root_state = state, 
+                        world = Connect4, 
+                        s_rollout = int(1e3), 
+                        max_expansion = 7, 
+                        tree  = True,
+                    )
+                )
+                _, root = await mcts_eval
+
             elif state.player == 2 and app.opponent == 1:
                 mcts_choice = asyncio.create_task(
                     MCTS.mcts(
@@ -256,11 +372,13 @@ async def pick_action(app: App, state: Connect4Board) -> int:
                         world = Connect4, 
                         s_rollout = int(1e5), 
                         max_expansion = 7, 
+                        tree  = True,
                         debug = True,
                         timer = True
                     )
                 )
-                action = await mcts_choice
+                action, root = await mcts_choice
+
         case 3:
             mcts_choice = asyncio.create_task(
                 MCTS.mcts(
@@ -268,24 +386,28 @@ async def pick_action(app: App, state: Connect4Board) -> int:
                     world = Connect4, 
                     s_rollout = int(1e5), 
                     max_expansion = 7, 
+                    tree  = True,
                     debug = True
                 )
             )
-            action = await mcts_choice
-    return action
+            action, root = await mcts_choice
 
-async def game(app: App, state: Connect4Board) -> tuple[Connect4Board, int]:
-    action: int = await pick_action(app, state)
+    return action, root
+
+async def game(app: App, state: Connect4Board) -> tuple[Connect4Board, int, Optional[MCTSNode]]:
+    action, root = await pick_action(app, state)
     if not type(action) == int:
-        return state, 0
+        return state, 0, None
     state = Connect4.play(state, action)
-    return state, Connect4.check_result(state, action)
+    return state, Connect4.check_result(state, action), root
 
 async def main() -> None:
     pygame.init()
     app: App = App()
 
     state: Connect4Board = None
+    root: MCTSNode = None
+    move_count: int = 0
 
     outcome: int = 0
     timer_start = None
@@ -309,17 +431,17 @@ async def main() -> None:
                 state: Connect4Board = Connect4.init_board(6, 7)
                 app.in_game = True
 
-            # app.in_game = app.in_game and not (
-                    # app.mouse_click != None 
-                # and app.esc_button[0].collidepoint(app.mouse_click[0], app.mouse_click[1])
-            # )
-
             if app.in_game:
-                draw_game(app, state)
+                draw_game(app, state, root, move_count, Connect4.reverse_player(state.player))
                 pygame.display.flip()
 
                 current_task = asyncio.create_task(game(app, state))
-                state, result = await current_task
+                state, result, new_root = await current_task
+
+                if new_root is not None:
+                    root = new_root
+                    move_count += 1 if state.player == 2 else 0
+
                 app.in_game = result == 0
                 current_task = None
 
