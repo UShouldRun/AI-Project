@@ -16,7 +16,7 @@ class App:
         self.mouse_click: tuple[int, int] = None
 
         font = pygame.font.Font(None, int(self.window.scale * self.window.info.current_w) // 25)
-        self.font = font
+        self.font = pygame.font.Font(None, int(self.window.scale * self.window.info.current_w) // 30)
 
         # width: int  = int(self.window.scale * self.window.info.current_w) // 20
         # height: int = int(self.window.scale * self.window.info.current_h) // 20
@@ -132,7 +132,6 @@ def pick_opponnent(app: App) -> int:
     return 0
 
 def draw_result(app: App, result: int) -> None:
-    draw_base(app.window)
     label = app.player1_win if result == 1 else (app.player2_win if result == 2 else app.draw)
     app.window.window.blit(
         label,
@@ -196,6 +195,10 @@ def draw_game(app: App, state: Connect4Board, root: MCTSNode, move_count: int, p
                     radius * 0.85
                 )
 
+            if i == rows - 1:
+                col_name = app.font.render(f"{chr(ord('A') + j)}", True, (255, 255, 255))
+                app.window.window.blit(col_name, col_name.get_rect(center = center))
+
     mouse_x, _ = pygame.mouse.get_pos()
     center: tuple[int, int] = (
         base_rect.x + radius 
@@ -233,19 +236,24 @@ def draw_mcts_eval(app: App, root: MCTSNode, x: int, y: int, move_count: int, pl
     )
 
     width: int = int(0.99 * app.window.scale * app.window.info.current_w - x)
-    height: int = int(app.window.scale * app.window.info.current_h) // 10
+    height: int = int(app.window.scale * app.window.info.current_h) // 12
 
     for i, child in enumerate(sorted(root.get_children(), key = eval_child, reverse = True)):
         rect: pygame.Rect = pygame.Rect(
-            x + 5, y + i * (height + 3), width, height
+            x + (int(app.window.scale * app.window.info.current_w) - x - width) // 2, y + i * (height + 3), width, height
         )
         eval_rect: pygame.Rect = pygame.Rect(
-            x + width // 25, y + i * (height + 3) + height // 20, width // 6, int(0.9 * height)
+            x + int(0.2 * height), y + i * (height + 3) + int(0.05 * height), width // 6, int(0.9 * height)
         )
 
         eval: float = eval_child(child)  * (1 if player == 1 else -1)
+        text: str = (
+            (f"{eval:.2f}" if abs(eval) < float("inf") else "U") 
+            if child.terminal == -1
+            else ("W" if child.terminal != .5 else "D")
+        )
         eval_text = app.font.render(
-            f"{eval:.2f}",
+            text,
             True,
             (255, 255, 255)
         )
@@ -267,11 +275,11 @@ def draw_mcts_eval(app: App, root: MCTSNode, x: int, y: int, move_count: int, pl
             if node.depth == 1 and player == 2:
                 best_path += ".. "
             elif node.s_children > 0:
-                best_path += f"{node.action + 1} "
+                best_path += f"{chr(ord('A') + node.action)} "
                 node = max(node.get_children(), key = eval_child)
 
             if node.s_children > 0:
-                best_path += f"{node.action + 1} "
+                best_path += f"{chr(ord('A') + node.action)} "
                 node = max(node.get_children(), key = eval_child)
 
             best_path_text = app.font.render(
@@ -282,8 +290,6 @@ def draw_mcts_eval(app: App, root: MCTSNode, x: int, y: int, move_count: int, pl
 
             if eval_rect.x + eval_rect.width + best_path_text.get_rect().width >= rect.x + int(0.85 * rect.width) or node.s_children == 0:
                 break
-
-            node = max(node.get_children(), key = eval_child)
 
         pygame.draw.rect(
             app.window.window,
@@ -310,7 +316,7 @@ def draw_mcts_eval(app: App, root: MCTSNode, x: int, y: int, move_count: int, pl
             best_path_text, 
             best_path_text.get_rect(
                 center = (
-                    eval_rect.x + eval_rect.width + 5 + best_path_text.get_rect().width // 2,
+                    eval_rect.x + eval_rect.width + 10 + best_path_text.get_rect().width // 2,
                     rect.y + rect.height // 2
                 )
             )
@@ -373,7 +379,7 @@ async def pick_action(app: App, state: Connect4Board) -> tuple[int, Optional[MCT
                         s_rollout = int(1e5), 
                         max_expansion = 7, 
                         tree  = True,
-                        debug = True,
+                        debug = False,
                         timer = True
                     )
                 )
@@ -387,7 +393,7 @@ async def pick_action(app: App, state: Connect4Board) -> tuple[int, Optional[MCT
                     s_rollout = int(1e5), 
                     max_expansion = 7, 
                     tree  = True,
-                    debug = True
+                    debug = False
                 )
             )
             action, root = await mcts_choice
@@ -456,6 +462,7 @@ async def main() -> None:
                     outcome = 3
 
                 if timer_start != None and time.time() - timer_start <= duration:
+                    draw_game(app, state, root, move_count, Connect4.reverse_player(state.player))
                     draw_result(app, outcome)
                 else:
                     outcome = 0
