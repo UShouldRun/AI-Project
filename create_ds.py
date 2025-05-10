@@ -1,6 +1,7 @@
 from lib.mcts import MCTS, Optional
 from lib.connect4 import Connect4
 from csv import writer
+from random import randint, choice
 
 import numpy as np
 import asyncio
@@ -42,6 +43,18 @@ async def generate_ds(s_rollout: int, dt_size: int) -> np.array:
         curr_player: int = 1
         value: int = -1
 
+        j: int = 0
+        n: int = randint(0,8)
+        while j < n:
+            action = choice(Connect4.get_actions(board))
+            board = Connect4.play(board, action)
+            value = Connect4.value(board, action)
+            j += 1
+            if value != -1:
+                board = Connect4.init_board(6, 7)
+                value = -1
+                j     = 0
+
         while value == -1:
             action, _ = await MCTS.mcts(board, Connect4, s_rollout, max_expansion = 7, debug = False)
             game_records[curr_player].append((Connect4.copy(board), action))
@@ -50,21 +63,9 @@ async def generate_ds(s_rollout: int, dt_size: int) -> np.array:
             value       = Connect4.value(board, action)
             curr_player = Connect4.reverse_player(curr_player)
 
-        # print(f"  result: { 'win' if value == 1 and board.player != curr_player else ('draw' if value == .5 else 'loss') }")
-        # print(f"  state:")
-        # Connect4.print(board)
-
         result_dict = {}
-        for player in (1, 2):
-            if value == 1/2:
-                result = 1
-            elif value == 1 and player == curr_player:
-                result = 0
-            else:
-                result = 2
-
-            moves_arr = np.array(game_records[player], dtype = object)
-            result_dict[player] = (moves_arr, result)
+        result_dict[1] = np.array(game_records[1], dtype = object)
+        result_dict[2] = np.array(game_records[2], dtype = object)
 
         games[i] = result_dict
 
@@ -86,14 +87,16 @@ def create_csv(games: np.array, filename: str):
 
     with open(filename, mode = "w", newline = "") as csvfile:
         csv_writer = writer(csvfile)
-        csv_writer.writerow(["game_id", "player", "board1", "board2", "action", "result"])
+        csv_writer.writerow(["player", "board1", "board2", "action"])
 
-        for game_id, game in enumerate(games):
-            for player, (moves, result) in game.items():
+        for game in games:
+            for player, moves in game.items():
                 for board, action in moves:
-                    csv_writer.writerow(
-                        [game_id, player, board.board1, board.board2, action, result]
-                    )
+                    csv_writer.writerow([
+                        player,
+                        board.board1, board.board2,
+                        action
+                    ])
 
 async def main():
     if len(sys.argv) != 4:
