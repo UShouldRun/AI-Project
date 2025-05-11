@@ -56,23 +56,20 @@ Example of using `Connect4` with `MCTS`:
 ```python
 from lib.mcts import MCTS
 from lib.connect4 import Connect4, Connect4Board
-import asyncio
 
-async def main():
+def main():
     board = Connect4.init_board(6, 7)
-    best_move = await MCTS.mcts(
-        root_state=board,
-        world=Connect4,
-        s_rollout=1000,
-        s_initial_rollout=100,
-        c=1.414,
-        max_expansion=7,
-        debug=False,
-        timer=True
+    best_move = MCTS.mcts(
+        root_state = board,
+        world = Connect4,
+        s_rollout = 1000,
+        s_initial_rollout = 100,
+        c = 1.414,
+        max_expansion = 7
     )
     print(f"Best move: Column {best_move}")
     new_board = Connect4.play(board, best_move)
     Connect4.print(new_board)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

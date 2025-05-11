@@ -2,10 +2,11 @@ from lib.mcts import MCTS, Optional
 from lib.connect4 import Connect4
 from csv import writer
 from random import randint, choice
+from itertools import repeat
 
 import numpy as np
-import asyncio
 import sys
+import os
 
 def progress_print(iteration: int, total_items: int) -> None:
     bar_length: int = 50
@@ -19,7 +20,7 @@ def progress_print(iteration: int, total_items: int) -> None:
     sys.stdout.write(f"\r[{bar}] {percent}% ({iteration + 1}/{total_items})")
     sys.stdout.flush()
 
-async def generate_ds(s_rollout: int, dt_size: int) -> np.array:
+def generate_ds(s_rollout: int, dt_size: int, total: int, iter: int) -> np.array:
     """
     Generate a dataset of self-play Connect4 games using MCTS.
 
@@ -34,7 +35,7 @@ async def generate_ds(s_rollout: int, dt_size: int) -> np.array:
     games: np.array = np.empty(dt_size, dtype = object)
 
     for i in range(dt_size):
-        progress_print(i, dt_size)
+        progress_print(iter + i, total)
 
         game_records: dict = {1: [], 2: []}
 
@@ -56,7 +57,7 @@ async def generate_ds(s_rollout: int, dt_size: int) -> np.array:
                 j     = 0
 
         while value == -1:
-            action, _ = await MCTS.mcts(board, Connect4, s_rollout, max_expansion = 7, debug = False)
+            action, _ = MCTS.mcts(board, Connect4, s_rollout, max_expansion = 7, debug = False)
             game_records[curr_player].append((Connect4.copy(board), action))
 
             board       = Connect4.play(board, action)
@@ -69,7 +70,8 @@ async def generate_ds(s_rollout: int, dt_size: int) -> np.array:
 
         games[i] = result_dict
 
-    print(f"\nSuccessfully generated all {dt_size} games")
+    if iter + dt_size >= total:
+        print(f"\nSuccessfully generated all {total} games")
 
     return games
 
@@ -85,9 +87,12 @@ def create_csv(games: np.array, filename: str):
       - result: 0 (lose), 1 (draw), or 2 (win)
     """
 
-    with open(filename, mode = "w", newline = "") as csvfile:
+    file_exists: bool = os.path.exists(filename)
+    mode: str = 'a' if file_exists else 'w'
+    with open(filename, mode = mode, newline = "") as csvfile:
         csv_writer = writer(csvfile)
-        csv_writer.writerow(["player", "board1", "board2", "action"])
+        if not file_exists:
+            csv_writer.writerow(["player", "board1", "board2", "action"])
 
         for game in games:
             for player, moves in game.items():
@@ -98,7 +103,7 @@ def create_csv(games: np.array, filename: str):
                         action
                     ])
 
-async def main():
+def main():
     if len(sys.argv) != 4:
         print("Usage: python create_ds.py <filename.csv: str> <s_rollout: int> <dt_size: int>")
         sys.exit(1)
@@ -106,8 +111,14 @@ async def main():
     s_rollout: int = int(sys.argv[2])
     dt_size: int   = int(sys.argv[3])
 
-    games = await generate_ds(s_rollout = s_rollout, dt_size = dt_size)
-    create_csv(games, filename = filename)
+    n: int = dt_size // 5
+    remainder: int = dt_size % 5
+    for i in range(n):
+        games = generate_ds(s_rollout = s_rollout, dt_size = 5, total = dt_size, iter = 5 * i)
+        create_csv(games, filename = filename)
+    if remainder > 0:
+        games = generate_ds(s_rollout = s_rollout, dt_size = remainder, total = dt_size, iter = n)
+        create_csv(games, filename = filename)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

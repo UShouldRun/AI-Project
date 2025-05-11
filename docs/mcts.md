@@ -71,4 +71,4 @@ Static methods implementing the MCTS algorithm.
 -   `_backpropagate(node, reward) -> None`: Backpropagates reward.
 -   `_backpropagate_terminal(node, terminal) -> None`: Backpropagates terminal value.
 -   `_print_node(node, state, world, c) -> None`: Prints node information (debugging).
--   `async def mcts(...) -> Action`: Main MCTS function to find the best action.
+-   `def mcts(...) -> Action`: Main MCTS function to find the best action.

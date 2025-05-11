@@ -372,7 +372,7 @@ class MCTS:
         print("  }\n}")
 
     @staticmethod
-    async def mcts(
+    def mcts(
         root_state: State, world: MCTSInterface, s_rollout: int, max_expansion: int = 10,
         s_initial_rollout: int = 100, c: float = round(sqrt(2), 3),
         tree: bool = False, debug: bool = False, timer: bool = False
