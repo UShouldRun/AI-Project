@@ -219,7 +219,6 @@ def draw_game(app: App, state: Connect4Board, root: MCTSNode, move_count: int, p
     )
 
     draw_mcts_eval(app, root, cols * s_col + 10, s_row, move_count, player)
-    MCTS.clear_tree(root)
 
 def draw_mcts_eval(app: App, root: MCTSNode, x: int, y: int, move_count: int, player: int) -> None:
     if app is None or root is None:
@@ -339,57 +338,75 @@ def player_action(app: App, state: Connect4Board) -> int:
 
     return None
 
-def pick_action(app: App, state: Connect4Board) -> tuple[int, Optional[MCTSNode]]:
+def pick_action(app: App, state: Connect4Board, root: Optional[MCTSNode]) -> tuple[int, Optional[MCTSNode]]:
     action: int = None
-    root: Optional[MCTSNode] = None
+    
     match app.gamemode:
         case 1:
             if app.mouse_click is not None:
                 action = player_action(app, state)
+
+                if root is not None:
+                    MCTS.clear_tree(root)
+                    root = None
+
                 _, root = MCTS.mcts(
                     root_state = state, 
                     world = Connect4, 
                     s_rollout = int(1e3), 
                     max_expansion = 7, 
-                    tree  = True,
+                    tree = True
                 )
 
         case 2:
             if state.player == 1 and app.mouse_click is not None:
                 action = player_action(app, state)
+
+                if root is not None:
+                    MCTS.clear_tree(root)
+                    root = None
+
+
                 _, root = MCTS.mcts(
                     root_state = state, 
                     world = Connect4, 
                     s_rollout = int(1e3), 
                     max_expansion = 7, 
-                    tree  = True,
+                    tree = True
                 )
 
             elif state.player == 2 and app.opponent == 1:
+                if root is not None:
+                    MCTS.clear_tree(root)
+                    root = None
+
+
                 action, root = MCTS.mcts(
                     root_state = state, 
                     world = Connect4, 
                     s_rollout = int(1e5), 
                     max_expansion = 7, 
                     tree  = True,
-                    debug = False,
                     timer = True
                 )
 
         case 3:
+            if root is not None:
+                MCTS.clear_tree(root)
+                root = None
+
             action, root = MCTS.mcts(
                 root_state = state, 
                 world = Connect4, 
                 s_rollout = int(1e5), 
                 max_expansion = 7, 
-                tree  = True,
-                debug = False
+                tree = True
             )
 
     return action, root
 
-def game(app: App, state: Connect4Board) -> tuple[Connect4Board, int, Optional[MCTSNode]]:
-    action, root = pick_action(app, state)
+def game(app: App, state: Connect4Board, root: Optional[MCTSNode]) -> tuple[Connect4Board, int, Optional[MCTSNode]]:
+    action, root = pick_action(app, state, root)
     if not type(action) == int:
         return state, 0, None
     state = Connect4.play(state, action)
@@ -429,7 +446,7 @@ def main() -> None:
                 draw_game(app, state, root, move_count, Connect4.reverse_player(state.player))
                 pygame.display.flip()
 
-                state, result, new_root = game(app, state)
+                state, result, new_root = game(app, state, root)
                 if new_root is not None:
                     root = new_root
                     move_count += 1 if state.player == 2 else 0
