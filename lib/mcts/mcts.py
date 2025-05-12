@@ -372,6 +372,19 @@ class MCTS:
         print("  }\n}")
 
     @staticmethod
+    def clear_tree(node: MCTSNode) -> None:
+        """Recursively break circular references in the tree"""
+        if not node:
+            return
+            
+        node.parent = None
+        for child in node.get_children():
+            MCTS.clear_tree(child)
+
+        node.children = None
+        node.s_children = 0
+
+    @staticmethod
     def mcts(
         root_state: State, world: MCTSInterface, s_rollout: int, max_expansion: int = 10,
         s_initial_rollout: int = 100, c: float = round(sqrt(2), 3),
@@ -429,4 +442,8 @@ class MCTS:
             print("Left normally")
             MCTS._print_node(root, root_state, world, c)
 
-        return MCTS._pick_action(root), None if not tree else root
+        action: int = MCTS._pick_action(root)
+        if not tree:
+            MCTS.clear_tree(root)
+
+        return action, None if not tree else root

@@ -219,6 +219,7 @@ def draw_game(app: App, state: Connect4Board, root: MCTSNode, move_count: int, p
     )
 
     draw_mcts_eval(app, root, cols * s_col + 10, s_row, move_count, player)
+    MCTS.clear_tree(root)
 
 def draw_mcts_eval(app: App, root: MCTSNode, x: int, y: int, move_count: int, player: int) -> None:
     if app is None or root is None:
