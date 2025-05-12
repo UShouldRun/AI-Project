@@ -2,7 +2,6 @@ from lib.mcts import MCTS, Optional, List
 from lib.connect4 import Connect4
 from csv import writer
 from random import randint, choice
-# from memory_profiler import profile
 
 import sys
 import os
@@ -31,7 +30,7 @@ def generate_and_save_game(s_rollout: int, csv_writer, game_idx: int, total_game
     value: int = -1
     
     j: int = 0
-    n: int = randint(0, 8)
+    n: int = randint(0, 12)
     while j < n:
         valid_actions: List[int] = Connect4.get_actions(board)
         if not valid_actions:
@@ -51,13 +50,15 @@ def generate_and_save_game(s_rollout: int, csv_writer, game_idx: int, total_game
     
     move_count: int = 0
     while value == -1:
-        action, _ = MCTS.mcts(board, Connect4, s_rollout, max_expansion = 7, tree = False)
-        
-        csv_writer.writerow([
-            curr_player,
-            board.board1, board.board2,
-            action
-        ])
+        if randint(0, 99) < 25:
+            action: int = choice(Connect4.get_actions(board))
+        else:
+            action, _ = MCTS.mcts(board, Connect4, s_rollout, max_expansion = 7, tree = False)
+            csv_writer.writerow([
+                curr_player,
+                board.board1, board.board2,
+                action
+            ])
         
         board = Connect4.play(board, action)
         value = Connect4.value(board, action)
