@@ -30,38 +30,7 @@ def most_common_label(y):
     unique_labels, counts = np.unique(y, return_counts=True)
     return unique_labels[np.argmax(counts)]
 
-def count_nodes(node):
-    """Count the number of nodes in a tree."""
-    if node.results is not None:  # Leaf node
-        return 1
-    return 1 + count_nodes(node.true_branch) + count_nodes(node.false_branch)
-
-def collect_leaf_values(node, values=None):
-    """
-    Collects all leaf values in a subtree.
-    """
-    if values is None:
-        values = []
-    
-    if node.results is not None:
-        values.append(node.results)
-    else:
-        collect_leaf_values(node.true_branch, values)
-        collect_leaf_values(node.false_branch, values)
-    
-    return values
-
-def most_common_leaf_value(node):
-    """
-    Find the most common leaf value in a subtree.
-    This helps determine what the majority class would be if we pruned.
-    """
-    leaf_values = collect_leaf_values(node)
-    unique_values, counts = np.unique(leaf_values, return_counts=True)
-    return unique_values[np.argmax(counts)]
-
-
-def evaluate_split(X, y, feature):
+def evaluate_split(X, y, feature, current_entropy):
     """Evaluate the best split for a single feature."""
     best_gain = 0
     best_value = None
@@ -69,9 +38,8 @@ def evaluate_split(X, y, feature):
     
     # Get unique values for the feature
     feature_values = np.sort(np.unique(X[:, feature]))
-   
-
-
+    
+    # For very large datasets, sample threshold values instead of trying all midpoints
     if len(feature_values) > 100:
         # Use percentiles instead of all values
         percentiles = np.linspace(10, 90, 9)  # 10%, 20%, ..., 90%
@@ -80,8 +48,6 @@ def evaluate_split(X, y, feature):
         # For smaller sets, use midpoints between consecutive values
         feature_values = [(feature_values[i] + feature_values[i+1])/2 
                          for i in range(len(feature_values)-1)]
-    
-
     
     for value in feature_values:
         true_X, true_y, false_X, false_y = split_data(X, y, feature, value)
@@ -116,13 +82,22 @@ def build_tree(X,y, max_depth=None, min_samples=2, depth=0):
     n_features = X.shape[1]
 
     for feature in range(n_features):
+        feature_values = np.sort(np.unique(X[:, feature])) 
 
-        gain, value, sets, _ = evaluate_split(X,y,feature)
-       
-        if gain>best_gain:
-            best_gain=gain 
-            best_criteria=(feature,value)
-            best_sets= sets
+        for i in range(len(feature_values) - 1):
+            value = (feature_values[i] + feature_values[i + 1]) / 2
+
+            true_X, true_y, false_X, false_y = split_data(X, y, feature, value)
+
+            if len(true_y) == 0 or len(false_y) == 0:
+                continue
+
+            gain = information_gain(y, true_y, false_y)
+
+            if gain>best_gain:
+                best_gain=gain 
+                best_criteria=(feature,value)
+                best_sets= (true_X, true_y, false_X, false_y)
 
     if best_gain <= 0:
         return Node(results=most_common_label(y))
@@ -142,49 +117,6 @@ def predict(tree, sample):
         if sample[tree.feature] <= tree.value:
             branch=tree.true_branch
         return predict(branch,sample)
-
-def batch_predict(tree, X, batch_size=1000):
-    """Make predictions in batches to save memory."""
-    predictions = np.zeros(len(X), dtype=int)
-    
-    for i in range(0, len(X), batch_size):
-        batch_X = X[i:i+batch_size]
-        batch_predictions = np.array([predict(tree, sample) for sample in batch_X])
-        predictions[i:i+batch_size] = batch_predictions
-        
-    return predictions
-
-def save_tree(tree, filename):
-    """Save the tree to a file using numpy."""
-    np.save(filename, tree)
-
-def load_tree(filename):
-    """Load the tree from a file."""
-    return np.load(filename, allow_pickle=True).item()
-
-def tree_to_rules(node, feature_names=None, path=None):
-    """Convert a decision tree to a set of rules."""
-    if path is None:
-        path = []
-    
-    if node.results is not None:
-        # We've reached a leaf node
-        return [{"conditions": path.copy(), "prediction": node.results}]
-    
-    # Format feature name
-    feature_name = f"Feature {node.feature}"
-    if feature_names is not None:
-        feature_name = feature_names[node.feature]
-    
-    # Rules for left branch (true)
-    left_path = path + [(feature_name, "<=", node.value)]
-    left_rules = tree_to_rules(node.true_branch, feature_names, left_path)
-    
-    # Rules for right branch (false)
-    right_path = path + [(feature_name, ">", node.value)]
-    right_rules = tree_to_rules(node.false_branch, feature_names, right_path)
-    
-    return left_rules + right_rules
 
 def print_tree(node,feature_names=None, indent=""):
 
