@@ -409,7 +409,6 @@ def k_fold_with_pruning(data, k=5, seed=70):
     print(f"\nBest method: {methods[best_method_index]} with {avg_accs[best_method_index]:.2%} average accuracy")
 
 def plot_accuracy_vs_dataset_size(data, feature_names, max_dataset_size=None, step_size=1000):
-
     accuracies = []
     dataset_sizes = []
 
@@ -439,12 +438,9 @@ def plot_accuracy_vs_dataset_size(data, feature_names, max_dataset_size=None, st
     plt.show()
 
 if __name__ == "__main__":
-
     print("started training")
-
-    dataset, feature_names =read_dt_csv("dt.csv")
-
-    tree=train_tree(dataset, feature_names)
+    dataset, feature_names = read_dt_csv("dt.csv")
+    tree = train_tree(dataset, feature_names)
     
     #avg_acc, std_acc=k_fold(dataset, k=10, seed=70)
     #print(f"\nAverage accuracy across {10} folds: {avg_acc:.2%}")
@@ -455,12 +451,9 @@ if __name__ == "__main__":
     #X = dataset[:, :-1]  
     #y = dataset[:, -1].astype(int)
     
-    
+    save_tree(tree = tree, filename = "utils/tree_bad_weights")
 
-    
-    save_tree(tree=tree,filename="tree_bad_weights")
-
-    # tree=load_tree(filename="tree_weights.npy")
+    # tree=load_tree(filename="utils/tree_weights.npy")
     
     #compare_pruning_methods(dataset)
 
@@ -479,5 +472,3 @@ if __name__ == "__main__":
     #avg_acc, std_acc=k_fold(dataset, k=10, seed=70,max_depth=best_depth, min_samples=best_samples)
     #print(f"\nAverage accuracy across {10} folds: {avg_acc:.2%}")
     #print(f"\nAverage std deviation across {10} folds: {std_acc:.2%}")
-
-

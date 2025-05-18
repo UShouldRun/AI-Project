@@ -368,7 +368,6 @@ def pick_action(app: App, state: Connect4Board, root: Optional[MCTSNode]) -> tup
                     MCTS.clear_tree(root)
                     root = None
 
-
                 _, root = MCTS.mcts(
                     root_state = state, 
                     world = Connect4, 
@@ -376,7 +375,6 @@ def pick_action(app: App, state: Connect4Board, root: Optional[MCTSNode]) -> tup
                     max_expansion = 7, 
                     tree = True
                 )
-
 
             elif state.player == 2 and app.opponent == 1:
                 if root is not None:
@@ -392,8 +390,7 @@ def pick_action(app: App, state: Connect4Board, root: Optional[MCTSNode]) -> tup
                     timer = True
                 )
 
-            elif state.player==2 and app.opponent==2:
-
+            elif state.player == 2 and app.opponent == 2:
                 if root is not None:
                     MCTS.clear_tree(root)
                     root = None
@@ -407,15 +404,13 @@ def pick_action(app: App, state: Connect4Board, root: Optional[MCTSNode]) -> tup
                     timer = True
                 )
 
-                dt,_=load_tree("tree_weights")
+                dt, _ = load_tree("utils/tree_weights")
 
                 full_state = state.get_full_state() 
-                action = int(predict(dt, sample=np.array(full_state)))
-
-
+                action = int(predict(dt, sample = np.array(full_state)))
 
         case 3:
-            if (state.player==1 and app.opponent==2) or (state.player==2 and app.opponent==1):
+            if (state.player == 1 and app.opponent == 2) or (state.player == 2 and app.opponent == 1):
                 if root is not None:
                     MCTS.clear_tree(root)
                     root = None
@@ -429,12 +424,12 @@ def pick_action(app: App, state: Connect4Board, root: Optional[MCTSNode]) -> tup
                     timer = False
                 )
 
-                dt,_=load_tree("tree_weights")
+                dt, _ = load_tree("utils/tree_weights")
 
                 full_state = state.get_full_state() 
                 action = int(predict(dt, sample=np.array(full_state)))
 
-            elif (state.player==2 and app.opponent==2) or (state.player==1 and app.opponent==1):
+            elif (state.player == 2 and app.opponent == 2) or (state.player == 1 and app.opponent == 1):
                 if root is not None:
                     MCTS.clear_tree(root)
                     root = None
@@ -474,8 +469,6 @@ def main() -> None:
             if event.type == pygame.QUIT:
                 app.running = False
             if event.type == pygame.KEYDOWN:
-                # if event.key == pygame.K_F11:
-                    # app.window.resize(1.00 if app.window.scale < 1.00 else 0.75)
                 if event.key == pygame.K_ESCAPE:
                     app.gamemode = 0
             if event.type == pygame.MOUSEBUTTONDOWN:

@@ -1,7 +1,7 @@
 from random import randint, choice
 from abc import ABC, abstractmethod
 from math import sqrt, log
-from typing import TypeVar, List, Optional
+from typing import TypeVar, List, Tuple, Optional
 from timeit import default_timer
 from itertools import repeat
 
@@ -243,7 +243,7 @@ class MCTS:
             else float("inf")
 
     @staticmethod
-    def _select(root: MCTSNode, root_state: State, world: MCTSInterface, c: float) -> tuple[Optional[MCTSNode], State]:
+    def _select(root: MCTSNode, root_state: State, world: MCTSInterface, c: float) -> Tuple[Optional[MCTSNode], State]:
         """Selects the best child node using the UCT formula."""
 
         node: MCTSNode = root
@@ -389,7 +389,7 @@ class MCTS:
         root_state: State, world: MCTSInterface, s_rollout: int, max_expansion: int = 10,
         s_initial_rollout: int = 100, c: float = round(sqrt(2), 3),
         tree: bool = False, debug: bool = False, timer: bool = False
-    ) -> tuple[Action, Optional[MCTSNode]]:
+    ) -> Tuple[Action, Optional[MCTSNode]]:
         """Performs the Monte Carlo Tree Search and returns the best action."""
 
         if timer:

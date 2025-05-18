@@ -33,7 +33,6 @@ For detailed documentation, refer to the files in the [`docs/`](./docs) director
 
 - Python 3.10+
 - [NumPy](https://numpy.org/)
-- [Asyncio](https://docs.python.org/3/library/asyncio.html) (comes built-in with Python 3.3+)
 
 ---
 
@@ -46,13 +45,11 @@ For detailed documentation, refer to the files in the [`docs/`](./docs) director
     ```
 
 2. **Install dependencies:**
-
     ```bash
     pip install numpy
     ```
 
 3. **Ensure Python 3 is installed:**
-
     - **Linux (Debian/Ubuntu):**
         ```bash
         sudo apt update
@@ -95,12 +92,7 @@ See [`docs/create_ds.md`](./docs/create_ds.md) for more information.
 
 ### Training the Decision Tree Model
 ```bash
-python lib/d_tree/build_dt.py --games <num_games> --mcts-rollouts <rollouts_per_move>
-```
-
-**Example:**
-```bash
-python lib/d_tree/build_dt.py --games 1000 --mcts-rollouts 500
+python3 lib/d_tree/read_dataset.py
 ```
 
 More details in [`docs/d_tree.md`](./docs/d_tree.md) (if available).
@@ -135,7 +127,6 @@ This project is licensed under the **MIT License**. See the [LICENSE](./LICENSE)
 ## Acknowledgments
 
 - Developed as part of the **Artificial Intelligence 2024/2025** course assignment.
-- Inspired by concepts from *"Adversarial search strategies and Decision Trees"*.
 
 ---
 
