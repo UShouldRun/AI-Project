@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import os
 
-from build_dt import build_tree, predict, print_tree 
+from lib.d_tree.build_dt import build_tree, predict, print_tree 
 
 def train_test_split(X,y, test_ratio=0.2, seed=70):
     np.random.seed(seed)
@@ -50,7 +50,7 @@ def k_fold(data, k=10, seed=70, max_depth=None, min_samples=2):
     return avg_acc, std_acc
 
 def read_iris_csv():
-    str_path="../../utils"
+    str_path="utils"
     file_path = os.path.join(str_path, "iris.csv")
 
     df = pd.read_csv(file_path)
@@ -120,6 +120,7 @@ if __name__ == "__main__":
     
     print("\nBefore hyperparameter_tuning")
     avg_acc, std_acc=k_fold(dataset, k=10, seed=70)
+
     print(f"\nAverage accuracy across {10} folds: {avg_acc:.2%}")
     print(f"\nAverage std deviation across {10} folds: {std_acc:.2%}")
 
@@ -127,7 +128,7 @@ if __name__ == "__main__":
 
     best_depth, best_samples = hyperparameter_tuning(dataset)
 
-    train_tree(dataset, feature_names, max_depth=best_depth, min_samples=best_samples, test_ratio=0.2)
+    train_tree(dataset, feature_names, max_depth=None, min_samples=None, test_ratio=0.2)
 
     avg_acc, std_acc=k_fold(dataset, k=10, seed=70,max_depth=best_depth, min_samples=best_samples)
     print(f"\nAverage accuracy across {10} folds: {avg_acc:.2%}")

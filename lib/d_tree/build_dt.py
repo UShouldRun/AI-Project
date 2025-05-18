@@ -1,8 +1,7 @@
 import numpy as np
 
-from classes.node import Node
-import time
-from joblib import Parallel, delayed
+from lib.d_tree.node import Node
+import pickle
 
 def entropy(data):
 
@@ -60,8 +59,12 @@ def most_common_leaf_value(node):
     unique_values, counts = np.unique(leaf_values, return_counts=True)
     return unique_values[np.argmax(counts)]
 
+def get_tree_depth(node):
+    if node is None or node.results is not None:
+        return 0
+    return 1 + max(get_tree_depth(node.true_branch), get_tree_depth(node.false_branch))
 
-def evaluate_split(X, y, feature):
+def evaluate_split_continuous(X, y, feature):
     """Evaluate the best split for a single feature."""
     best_gain = 0
     best_value = None
@@ -82,6 +85,46 @@ def evaluate_split(X, y, feature):
                          for i in range(len(feature_values)-1)]
     
 
+    
+    for value in feature_values:
+        true_X, true_y, false_X, false_y = split_data(X, y, feature, value)
+        if len(true_y) < 1 or len(false_y) < 1:
+            continue
+            
+        gain = information_gain(y, true_y, false_y)
+        
+        if gain > best_gain:
+            best_gain = gain
+            best_value = value
+            best_sets = (true_X, true_y, false_X, false_y)
+    
+    return best_gain, best_value, best_sets, feature
+
+def evaluate_split(X, y, feature):
+    """Evaluate the best split for a single feature."""
+    best_gain = 0
+    best_value = None
+    best_sets = None
+    
+    # Get unique values for the feature
+    feature_values = np.sort(np.unique(X[:, feature]))
+   
+    n_unique = len(feature_values)
+    
+    # For turn feature (assuming it's feature 0), use more granular splits
+    if feature == 0:
+        # For turn number, check more potential splits
+        if n_unique > 10:
+            # For early, mid and late game splits
+            candidate_percentiles = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+            feature_values = np.percentile(feature_values, candidate_percentiles)
+        
+    # For board position features, focus on meaningful values (empty, player1, player2)
+    elif 1 <= feature <= 42:
+        # For board positions, just check the midpoints between unique values
+        if n_unique > 1:
+            feature_values = [(feature_values[i] + feature_values[i+1])/2 
+                            for i in range(len(feature_values)-1)]    
     
     for value in feature_values:
         true_X, true_y, false_X, false_y = split_data(X, y, feature, value)
@@ -155,12 +198,12 @@ def batch_predict(tree, X, batch_size=1000):
     return predictions
 
 def save_tree(tree, filename):
-    """Save the tree to a file using numpy."""
-    np.save(filename, tree)
+    with open(filename, 'wb') as f:
+        pickle.dump(tree, f)
 
 def load_tree(filename):
-    """Load the tree from a file."""
-    return np.load(filename, allow_pickle=True).item()
+    with open(filename, 'rb') as f:
+        return pickle.load(f)
 
 def tree_to_rules(node, feature_names=None, path=None):
     """Convert a decision tree to a set of rules."""

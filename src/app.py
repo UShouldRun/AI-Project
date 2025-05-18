@@ -1,6 +1,8 @@
 from lib.connect4 import Connect4, Connect4Board
 from lib.mcts import MCTS, MCTSNode, Optional, List
+from lib.d_tree import predict, load_tree
 from src.window import Window
+import numpy as np
 
 import pygame
 import time
@@ -375,33 +377,76 @@ def pick_action(app: App, state: Connect4Board, root: Optional[MCTSNode]) -> tup
                     tree = True
                 )
 
+
             elif state.player == 2 and app.opponent == 1:
                 if root is not None:
                     MCTS.clear_tree(root)
                     root = None
 
-
                 action, root = MCTS.mcts(
                     root_state = state, 
                     world = Connect4, 
-                    s_rollout = int(1e5), 
+                    s_rollout = int(1e3), 
                     max_expansion = 7, 
                     tree  = True,
                     timer = True
                 )
 
-        case 3:
-            if root is not None:
-                MCTS.clear_tree(root)
-                root = None
+            elif state.player==2 and app.opponent==2:
 
-            action, root = MCTS.mcts(
-                root_state = state, 
-                world = Connect4, 
-                s_rollout = int(1e5), 
-                max_expansion = 7, 
-                tree = True
-            )
+                if root is not None:
+                    MCTS.clear_tree(root)
+                    root = None
+
+                _, root = MCTS.mcts(
+                    root_state = state, 
+                    world = Connect4, 
+                    s_rollout = int(1e3), 
+                    max_expansion = 7, 
+                    tree  = True,
+                    timer = True
+                )
+
+                dt,_=load_tree("tree_weights")
+
+                full_state = state.get_full_state() 
+                action = int(predict(dt, sample=np.array(full_state)))
+
+
+
+        case 3:
+            if (state.player==1 and app.opponent==2) or (state.player==2 and app.opponent==1):
+                if root is not None:
+                    MCTS.clear_tree(root)
+                    root = None
+
+                _, root = MCTS.mcts(
+                    root_state = state, 
+                    world = Connect4, 
+                    s_rollout = int(1e3), 
+                    max_expansion = 7, 
+                    tree  = True,
+                    timer = False
+                )
+
+                dt,_=load_tree("tree_weights")
+
+                full_state = state.get_full_state() 
+                action = int(predict(dt, sample=np.array(full_state)))
+
+            elif (state.player==2 and app.opponent==2) or (state.player==1 and app.opponent==1):
+                if root is not None:
+                    MCTS.clear_tree(root)
+                    root = None
+
+                action, root = MCTS.mcts(
+                    root_state = state, 
+                    world = Connect4, 
+                    s_rollout = int(1e3), 
+                    max_expansion = 7, 
+                    tree  = True,
+                    timer = False
+                )
 
     return action, root
 

@@ -4,7 +4,7 @@ import os
 
 def read_dt_csv():
     str_path = "../../utils"
-    file_path = os.path.join(str_path, "dt.csv")
+    file_path = os.path.join(str_path, "dt1.csv")
     df = pd.read_csv(file_path)
     return df
 
@@ -51,7 +51,7 @@ column_names = ["player"] + column_names  # Include player if used
 df_transformed = pd.DataFrame(np.hstack((X, y)), columns=column_names + ["action"])
 
 # Save to CSV
-output_path = os.path.join("../../utils", "dt_transformed.csv")
+output_path = os.path.join("../../utils", "dt1_transformed.csv")
 df_transformed.to_csv(output_path, index=False)
 
 

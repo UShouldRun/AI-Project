@@ -24,6 +24,14 @@ class Connect4Board:
             return 1
         piece = self.board2 >> (self.cols * row + col) & 0b1
         return 2 if piece == 1 else 0
+    
+    def get_full_state(self):
+        full_state=[]
+        full_state.append(self.player)
+        for i in range(self.rows):
+            for j in range(self.cols):
+                full_state.append(self.get_piece(i,j))
+        return full_state
 
 class Connect4(MCTSInterface):
     @staticmethod

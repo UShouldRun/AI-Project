@@ -2,8 +2,10 @@ import numpy as np
 import pandas as pd
 import os
 import time
-from classes.node import Node
-from build_dt import (build_tree, predict, batch_predict, save_tree, load_tree,
+from lib.d_tree.node import Node
+import copy
+import matplotlib.pyplot as plt
+from lib.d_tree.build_dt import (build_tree, predict, batch_predict, save_tree, load_tree, get_tree_depth,
     count_nodes, most_common_leaf_value)
 
 def train_test_split(X,y, test_ratio=0.2, seed=70):
@@ -43,7 +45,7 @@ def train_test_val_split(X, y, test_ratio=0.2, val_ratio=0.2, seed=70):
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 def read_dt_csv(filename:str):
-    str_path="../../utils"
+    str_path="utils"
     file_path = os.path.join(str_path, filename)
 
     df = pd.read_csv(file_path)
@@ -58,7 +60,7 @@ def train_tree(data, feature_names=None, max_depth=None, min_samples=2, test_rat
     X = data[:, :-1]  
     y = data[:, -1].astype(int)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_ratio=test_ratio)
-    decision_tree=build_tree(X_train,y_train)
+    decision_tree=build_tree(X_train,y_train, max_depth=max_depth, min_samples=min_samples)
 
     predictions = [predict(decision_tree, sample) for sample in X_test]
     
@@ -73,8 +75,8 @@ def hyperparameter_tuning(data):
     y = data[:, -1].astype(int)
     
     # Define parameter grid
-    max_depths = [None, 3, 5, 7, 10]
-    min_samples = [2, 5, 10]
+    max_depths = [None, 7, 10, 20]
+    min_samples = [2, 20, 50, 100]
     
     best_score = 0
     best_params = None
@@ -253,11 +255,13 @@ def compare_pruning_methods(data):
     print("\n=== Original Tree ===")
     tree = build_tree(X_train, y_train)
     nodes_count = count_nodes(tree)
+    depth = get_tree_depth(tree) 
     train_acc = evaluate_accuracy(tree, X_train, y_train)
     val_acc = evaluate_accuracy(tree, X_val, y_val)
     test_acc = evaluate_accuracy(tree, X_test, y_test)
     
     print(f"Number of nodes: {nodes_count}")
+    print(f"Tree depth: {depth}")
     print(f"Training accuracy: {train_acc:.2%}")
     print(f"Validation accuracy: {val_acc:.2%}")
     print(f"Test accuracy: {test_acc:.2%}")
@@ -265,20 +269,22 @@ def compare_pruning_methods(data):
     
     # Reduced Error Pruning
     print("\n=== Tree with Reduced Error Pruning ===")
-    pruned_tree = prune_tree(tree, X_val, y_val)
+    pruned_tree = prune_tree(copy.deepcopy(tree), X_val, y_val)
     nodes_count = count_nodes(pruned_tree)
+    depth = get_tree_depth(pruned_tree) 
     train_acc = evaluate_accuracy(pruned_tree, X_train, y_train)
     val_acc = evaluate_accuracy(pruned_tree, X_val, y_val)
     test_acc = evaluate_accuracy(pruned_tree, X_test, y_test)
     
     print(f"Number of nodes: {nodes_count}")
+    print(f"Tree depth: {depth}")
     print(f"Training accuracy: {train_acc:.2%}")
     print(f"Validation accuracy: {val_acc:.2%}")
     print(f"Test accuracy: {test_acc:.2%}")
     print("\nTree structure:")
     
     # Cost Complexity Pruning with different alpha values
-    alpha_values = [0.001, 0.01, 0.05, 0.1, 0.2]
+    alpha_values = [0.001, 0.01, 0.05]
     best_alpha = 0
     best_accuracy = 0
     best_tree = None
@@ -286,11 +292,13 @@ def compare_pruning_methods(data):
     print("\n=== Cost Complexity Pruning ===")
     for alpha in alpha_values:
         print(f"\nTesting alpha = {alpha}")
-        ccp_tree = cost_complexity_pruning(tree, X_val, y_val, alpha)
+        ccp_tree = cost_complexity_pruning(copy.deepcopy(tree), X_val, y_val, alpha)
         nodes_count = count_nodes(ccp_tree)
+        depth = get_tree_depth(ccp_tree)
         val_acc = evaluate_accuracy(ccp_tree, X_val, y_val)
         
         print(f"Number of nodes: {nodes_count}")
+        print(f"Tree depth: {depth}")
         print(f"Validation accuracy: {val_acc:.2%}")
         
         if val_acc > best_accuracy:
@@ -302,17 +310,18 @@ def compare_pruning_methods(data):
     print("\n=== Best Cost Complexity Pruning Tree ===")
     print(f"Best alpha: {best_alpha}")
     nodes_count = count_nodes(best_tree)
+    depth = get_tree_depth(best_tree) 
     train_acc = evaluate_accuracy(best_tree, X_train, y_train)
     val_acc = evaluate_accuracy(best_tree, X_val, y_val)
     test_acc = evaluate_accuracy(best_tree, X_test, y_test)
     
     print(f"Number of nodes: {nodes_count}")
+    print(f"Tree depth: {depth}")
     print(f"Training accuracy: {train_acc:.2%}")
     print(f"Validation accuracy: {val_acc:.2%}")
     print(f"Test accuracy: {test_acc:.2%}")
     print("\nTree structure:")
     
-    return best_tree
 
 def k_fold_with_pruning(data, k=5, seed=70):
     """Perform k-fold cross-validation with pruning."""
@@ -330,6 +339,9 @@ def k_fold_with_pruning(data, k=5, seed=70):
     node_counts_unpruned = []
     node_counts_pruned = []
     node_counts_ccp = []
+    depths_unpruned = []
+    depths_pruned = []
+    depths_ccp = []
     
     for i in range(k):
         print(f"\n--- Fold {i+1}/{k} ---")
@@ -354,16 +366,19 @@ def k_fold_with_pruning(data, k=5, seed=70):
         tree = build_tree(X_train, y_train)
         acc_unpruned = evaluate_accuracy(tree, X_test, y_test)
         nodes_unpruned = count_nodes(tree)
+        depth_unpruned = get_tree_depth(tree)
         
         # Reduced Error Pruning
-        rep_tree = prune_tree(tree, X_val, y_val)
+        rep_tree = prune_tree(copy.deepcopy(tree), X_val, y_val)
         acc_pruned = evaluate_accuracy(rep_tree, X_test, y_test)
         nodes_pruned = count_nodes(rep_tree)
+        depth_pruned = get_tree_depth(rep_tree)
         
         # Cost Complexity Pruning (CCP) with fixed alpha for simplicity
-        ccp_tree = cost_complexity_pruning(tree, X_val, y_val, alpha=0.01)
+        ccp_tree = cost_complexity_pruning(copy.deepcopy(tree), X_val, y_val, alpha=0.001)
         acc_ccp = evaluate_accuracy(ccp_tree, X_test, y_test)
         nodes_ccp = count_nodes(ccp_tree)
+        depth_ccp = get_tree_depth(ccp_tree)
         
         # Record results
         unpruned_accuracies.append(acc_unpruned)
@@ -372,6 +387,9 @@ def k_fold_with_pruning(data, k=5, seed=70):
         node_counts_unpruned.append(nodes_unpruned)
         node_counts_pruned.append(nodes_pruned)
         node_counts_ccp.append(nodes_ccp)
+        depths_unpruned.append(depth_unpruned)
+        depths_pruned.append(depth_pruned)
+        depths_ccp.append(depth_ccp)
         
         print(f"Unpruned tree: {nodes_unpruned} nodes, {acc_unpruned:.2%} accuracy")
         print(f"REP tree: {nodes_pruned} nodes, {acc_pruned:.2%} accuracy")
@@ -379,9 +397,9 @@ def k_fold_with_pruning(data, k=5, seed=70):
     
     # Summarize results
     print("\n=== Cross-Validation Summary ===")
-    print(f"Unpruned tree: {np.mean(node_counts_unpruned):.1f} nodes (avg), {np.mean(unpruned_accuracies):.2%} accuracy (avg)")
-    print(f"REP tree: {np.mean(node_counts_pruned):.1f} nodes (avg), {np.mean(pruned_accuracies):.2%} accuracy (avg)")
-    print(f"CCP tree: {np.mean(node_counts_ccp):.1f} nodes (avg), {np.mean(ccp_accuracies):.2%} accuracy (avg)")
+    print(f"Unpruned tree: {np.mean(node_counts_unpruned):.1f} nodes (avg),{np.mean(depths_unpruned):.1f} depth (avg),  {np.mean(unpruned_accuracies):.2%} accuracy (avg)")
+    print(f"REP tree: {np.mean(node_counts_pruned):.1f} nodes (avg),{np.mean(depths_pruned):.1f} depth (avg), {np.mean(pruned_accuracies):.2%} accuracy (avg)")
+    print(f"CCP tree: {np.mean(node_counts_ccp):.1f} nodes (avg),{np.mean(depths_ccp):.1f} depth (avg), {np.mean(ccp_accuracies):.2%} accuracy (avg)")
     
     # Find the best method
     avg_accs = [np.mean(unpruned_accuracies), np.mean(pruned_accuracies), np.mean(ccp_accuracies)]
@@ -390,36 +408,71 @@ def k_fold_with_pruning(data, k=5, seed=70):
     
     print(f"\nBest method: {methods[best_method_index]} with {avg_accs[best_method_index]:.2%} average accuracy")
 
+def plot_accuracy_vs_dataset_size(data, feature_names, max_dataset_size=None, step_size=1000):
+
+    accuracies = []
+    dataset_sizes = []
+
+    if max_dataset_size is None:
+        max_dataset_size = len(data)
+
+    for size in range(step_size, max_dataset_size + 1, step_size):
+        print(f"Training and evaluating on {size} samples...")
+
+
+        data_subset = data[:size]
+
+        accuracy, _ =k_fold(data_subset, k=5, seed=70)
+
+        print(accuracy)
+        accuracies.append(accuracy)
+        dataset_sizes.append(size)
+
+    # Plotting the results
+    plt.figure(figsize=(10, 6))
+    plt.plot(dataset_sizes, accuracies, marker='o', linestyle='-', color='blue')
+    plt.title("Decision Tree Accuracy vs. Dataset Size")
+    plt.xlabel("Dataset Size")
+    plt.ylabel("Accuracy")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
 if __name__ == "__main__":
 
     print("started training")
 
-    dataset, feature_names =read_dt_csv("dt_transformed.csv")
-    #train_tree(dataset, feature_names)
+    dataset, feature_names =read_dt_csv("dt.csv")
+
+    tree=train_tree(dataset, feature_names)
     
-    avg_acc, std_acc=k_fold(dataset, k=10, seed=70)
-    print(f"\nAverage accuracy across {10} folds: {avg_acc:.2%}")
-    print(f"\nAverage std deviation across {10} folds: {std_acc:.2%}")
+    #avg_acc, std_acc=k_fold(dataset, k=10, seed=70)
+    #print(f"\nAverage accuracy across {10} folds: {avg_acc:.2%}")
+    #print(f"\nAverage std deviation across {10} folds: {std_acc:.2%}")
+
+    #plot_accuracy_vs_dataset_size(dataset, feature_names=feature_names,max_dataset_size=None, step_size=2000) 
+
+    #X = dataset[:, :-1]  
+    #y = dataset[:, -1].astype(int)
+    
+    
 
     
-    X = dataset[:, :-1]  
-    y = dataset[:, -1].astype(int)
-
-
-    
-    #save_tree(tree=tree,filename="tree_weights")
+    save_tree(tree=tree,filename="tree_bad_weights")
 
     # tree=load_tree(filename="tree_weights.npy")
     
-    best_tree=compare_pruning_methods(dataset)
+    #compare_pruning_methods(dataset)
 
-    print("\n\n=== K-Fold Cross-Validation with Pruning ===")
-    k_fold_with_pruning(dataset, k=5)
+    #print("\n\n=== K-Fold Cross-Validation with Pruning ===")
+    #k_fold_with_pruning(dataset, k=5)
     
 
     #hyperparameter_tuning
 
     #best_depth, best_samples = hyperparameter_tuning(dataset)
+
+    #best max_depth= None, best_min_samples=2
 
     #train_tree(dataset, feature_names, max_depth=best_depth, min_samples=best_samples, test_ratio=0.2)
 

@@ -1,6 +1,7 @@
 import numpy as np
 
-from classes.node import Node
+from lib.d_tree.node import Node
+
 import time
 from joblib import Parallel, delayed
 
